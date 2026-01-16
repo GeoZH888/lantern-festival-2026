@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin | 管理后台</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; min-height: 100vh; background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460); color: #fff; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .lang-switch { position: fixed; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; }
+        .lang-switch button { padding: 8px 12px; border: 2px solid #ffd700; background: rgba(255, 215, 0, 0.2); color: #ffd700; border-radius: 8px; cursor: pointer; }
+        .lang-switch button.active { background: #ffd700; color: #1a1a2e; }
+        .lang-screen { padding-top: 80px; text-align: center; }
+        .lang-screen h1 { font-size: 2em; color: #ffd700; margin-bottom: 30px; }
+        .lang-selector { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .lang-btn { width: 250px; padding: 20px; font-size: 18px; border: 2px solid #ffd700; background: rgba(255, 215, 0, 0.1); color: #ffd700; border-radius: 10px; cursor: pointer; }
+        .lang-btn:hover { background: #ffd700; color: #1a1a2e; }
+        .header { text-align: center; padding: 15px 0; border-bottom: 2px solid #ffd700; margin-bottom: 25px; }
+        .header h1 { color: #ffd700; font-size: 1.8em; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 25px; }
+        .stat-card { background: rgba(255, 255, 255, 0.05); padding: 18px; border-radius: 12px; text-align: center; border: 1px solid rgba(255, 215, 0, 0.2); }
+        .stat-card .icon { font-size: 1.8em; margin-bottom: 8px; }
+        .stat-card .number { font-size: 1.8em; font-weight: bold; color: #ffd700; }
+        .stat-card .label { color: #87CEEB; font-size: 0.85em; margin-top: 5px; }
+        .stat-card.green .number { color: #4CAF50; }
+        .stat-card.orange .number { color: #FF9800; }
+        .stat-card.blue .number { color: #2196F3; }
+        .action-section { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .action-btn { padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .action-btn:hover { transform: scale(1.05); }
+        .action-btn.verify-all { background: linear-gradient(135deg, #4CAF50, #388E3C); color: #fff; }
+        .action-btn.csv { background: linear-gradient(135deg, #9C27B0, #7B1FA2); color: #fff; }
+        .action-btn.excel { background: linear-gradient(135deg, #2196F3, #1565C0); color: #fff; }
+        .action-btn.refresh { background: linear-gradient(135deg, #FF9800, #F57C00); color: #fff; }
+        .action-btn.lottery { background: linear-gradient(135deg, #E91E63, #C2185B); color: #fff; }
+        .filter-section { background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap; align-items: center; }
+        .filter-section label { color: #ffd700; }
+        .filter-section select, .filter-section input { padding: 8px 12px; border: 1px solid #ffd700; border-radius: 5px; background: rgba(0, 0, 0, 0.3); color: #fff; }
+        .table-section { background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 15px; overflow-x: auto; }
+        .data-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        .data-table th, .data-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .data-table th { background: rgba(255, 215, 0, 0.2); color: #ffd700; font-size: 0.9em; }
+        .data-table tr:hover { background: rgba(255, 255, 255, 0.05); }
+        .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }
+        .status-badge.verified { background: rgba(76, 175, 80, 0.3); color: #4CAF50; }
+        .status-badge.pending { background: rgba(255, 193, 7, 0.3); color: #FFC107; }
+        .status-badge.entered { background: rgba(33, 150, 243, 0.3); color: #2196F3; }
+        .role-badge { padding: 3px 8px; border-radius: 5px; font-size: 0.8em; }
+        .role-badge.staff { background: rgba(156, 39, 176, 0.3); color: #CE93D8; }
+        .role-badge.visitor { background: rgba(33, 150, 243, 0.3); color: #64B5F6; }
+        .lottery-num { color: #ffd700; font-weight: bold; font-size: 1.1em; }
+        .verify-btn { padding: 5px 12px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.85em; }
+        .verify-btn.approve { background: #4CAF50; color: #fff; }
+        .verify-btn.approve:hover { background: #388E3C; }
+        .verify-btn.done { background: rgba(76, 175, 80, 0.3); color: #4CAF50; cursor: default; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: linear-gradient(135deg, #1a1a2e, #16213e); padding: 35px; border-radius: 15px; border: 3px solid #ffd700; text-align: center; max-width: 420px; width: 90%; }
+        .modal-content h2 { color: #ffd700; margin-bottom: 20px; }
+        .lottery-display { font-size: 3.5em; color: #ffd700; font-weight: bold; margin: 20px 0; font-family: monospace; }
+        .winner-info { background: rgba(255, 215, 0, 0.1); padding: 18px; border-radius: 10px; margin: 18px 0; }
+        .modal-btn { padding: 12px 25px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin: 6px; }
+        .modal-btn.draw { background: linear-gradient(135deg, #ffd700, #ff8c00); color: #1a1a2e; }
+        .modal-btn.close { background: rgba(255, 255, 255, 0.1); color: #fff; border: 2px solid #fff; }
+        .last-update { text-align: center; color: #87CEEB; font-size: 0.85em; margin-top: 15px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="lang-switch">
+        <button id="switchIt">🇮🇹 IT</button>
+        <button id="switchZh">🇨🇳 中文</button>
+    </div>
+    
+    <div class="container">
+        <div class="lang-screen" id="langScreen">
+            <h1>🏮 Admin | 管理后台</h1>
+            <div class="lang-selector">
+                <button class="lang-btn" id="btnLangIt">🇮🇹 Italiano</button>
+                <button class="lang-btn" id="btnLangZh">🇨🇳 中文</button>
+            </div>
+        </div>
+        
+        <div id="mainScreen" class="hidden">
+            <div class="header"><h1 id="headerTitle">🏮 Pannello Admin</h1></div>
+            
+            <div class="stats-grid">
+                <div class="stat-card"><div class="icon">📝</div><div class="number" id="statTotal">0</div><div class="label" id="lblTotal">Totale</div></div>
+                <div class="stat-card orange"><div class="icon">⏳</div><div class="number" id="statPending">0</div><div class="label" id="lblPending">Da Verificare</div></div>
+                <div class="stat-card green"><div class="icon">✅</div><div class="number" id="statVerified">0</div><div class="label" id="lblVerified">Verificati</div></div>
+                <div class="stat-card blue"><div class="icon">🚪</div><div class="number" id="statEntered">0</div><div class="label" id="lblEntered">Entrati</div></div>
+            </div>
+            
+            <div class="action-section">
+                <button class="action-btn verify-all" id="btnVerifyAll">✅ Verifica Tutti</button>
+                <button class="action-btn csv" id="btnCsv">📄 CSV</button>
+                <button class="action-btn excel" id="btnExcel">📊 Excel</button>
+                <button class="action-btn refresh" id="btnRefresh">🔄</button>
+                <button class="action-btn lottery" id="btnLottery">🎯 Lotteria</button>
+            </div>
+            
+            <div class="filter-section">
+                <label id="lblFilter">Filtra:</label>
+                <select id="filterStatus">
+                    <option value="all">Tutti</option>
+                    <option value="pending">Da Verificare</option>
+                    <option value="verified">Verificati</option>
+                    <option value="entered">Entrati</option>
+                </select>
+                <select id="filterRole">
+                    <option value="all">Tutti i ruoli</option>
+                    <option value="visitor">Visitatori</option>
+                    <option value="staff">Staff</option>
+                </select>
+                <input type="text" id="filterSearch" placeholder="Cerca nome...">
+            </div>
+            
+            <div class="table-section">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th id="thName">Nome</th>
+                            <th id="thRole">Ruolo</th>
+                            <th id="thLottery">Lotteria</th>
+                            <th id="thContact">Contatto</th>
+                            <th id="thStatus">Stato</th>
+                            <th id="thAction">Azione</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            <p class="last-update"><span id="lblUpdate">Aggiornato</span>: <span id="updateTime">--</span></p>
+        </div>
+    </div>
+    
+    <div class="modal" id="lotteryModal">
+        <div class="modal-content">
+            <h2 id="lotteryTitle">🎯 Estrazione</h2>
+            <div class="lottery-display" id="lotteryDisplay">----</div>
+            <div class="winner-info" id="winnerInfo" style="display:none;">
+                <p><strong id="winnerLabel">Vincitore:</strong></p>
+                <p id="winnerName">-</p>
+            </div>
+            <div>
+                <button class="modal-btn draw" id="btnDraw">🎲 Estrai</button>
+                <button class="modal-btn close" id="btnClose">✖</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var SUPABASE_URL = 'https://mfwgfgjneeymavxgbwde.supabase.co';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1md2dmZ2puZWV5bWF2eGdid2RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTMzNzgsImV4cCI6MjA4Mzk4OTM3OH0.11Ww-TwArHnrM6Lw7q_ZbJu5tFLugsAq9jT6H6p42WE';
+        var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        var lang = 'it', allData = [];
+        
+        var T = {
+            it: { headerTitle: '🏮 Pannello Admin', lblTotal: 'Totale', lblPending: 'Da Verificare', lblVerified: 'Verificati', lblEntered: 'Entrati', btnVerifyAll: '✅ Verifica Tutti', thName: 'Nome', thRole: 'Ruolo', thLottery: 'Lotteria', thContact: 'Contatto', thStatus: 'Stato', thAction: 'Azione', lblUpdate: 'Aggiornato', lotteryTitle: '🎯 Estrazione', winnerLabel: 'Vincitore:', visitor: 'Visitatore', staff: 'Staff', pending: 'Da Verificare', verified: 'Verificato', entered: 'Entrato', btnVerify: '✓ Approva', btnDone: '✓ OK', noData: 'Nessun dato' },
+            zh: { headerTitle: '🏮 管理后台', lblTotal: '总计', lblPending: '待审核', lblVerified: '已审核', lblEntered: '已入场', btnVerifyAll: '✅ 全部审核', thName: '姓名', thRole: '角色', thLottery: '抽奖', thContact: '联系', thStatus: '状态', thAction: '操作', lblUpdate: '更新', lotteryTitle: '🎯 抽奖', winnerLabel: '获奖者:', visitor: '访客', staff: '工作人员', pending: '待审核', verified: '已审核', entered: '已入场', btnVerify: '✓ 通过', btnDone: '✓ 完成', noData: '无数据' }
+        };
+        
+        var $ = function(id) { return document.getElementById(id); };
+        
+        function updateUI() {
+            var t = T[lang];
+            $('headerTitle').textContent = t.headerTitle;
+            $('lblTotal').textContent = t.lblTotal; $('lblPending').textContent = t.lblPending;
+            $('lblVerified').textContent = t.lblVerified; $('lblEntered').textContent = t.lblEntered;
+            $('btnVerifyAll').textContent = t.btnVerifyAll;
+            $('thName').textContent = t.thName; $('thRole').textContent = t.thRole;
+            $('thLottery').textContent = t.thLottery; $('thContact').textContent = t.thContact;
+            $('thStatus').textContent = t.thStatus; $('thAction').textContent = t.thAction;
+            $('lblUpdate').textContent = t.lblUpdate; $('lotteryTitle').textContent = t.lotteryTitle;
+            $('winnerLabel').textContent = t.winnerLabel;
+            $('switchIt').classList.toggle('active', lang === 'it');
+            $('switchZh').classList.toggle('active', lang === 'zh');
+        }
+        
+        async function loadData() {
+            try {
+                var { data, error } = await supabase.from('registrations').select('*').order('created_at', { ascending: false });
+                if (error) throw error;
+                allData = data || [];
+                updateStats(); renderTable();
+                $('updateTime').textContent = new Date().toLocaleString(lang === 'it' ? 'it-IT' : 'zh-CN');
+            } catch (e) { console.error(e); }
+        }
+        
+        function updateStats() {
+            var total = allData.length;
+            var pending = allData.filter(function(r) { return !r.verified; }).length;
+            var verified = allData.filter(function(r) { return r.verified && !r.entered; }).length;
+            var entered = allData.filter(function(r) { return r.entered; }).length;
+            $('statTotal').textContent = total; $('statPending').textContent = pending;
+            $('statVerified').textContent = verified; $('statEntered').textContent = entered;
+        }
+        
+        function renderTable() {
+            var t = T[lang], tbody = $('tableBody');
+            var status = $('filterStatus').value, role = $('filterRole').value, search = $('filterSearch').value.toLowerCase();
+            var filtered = allData.filter(function(r) {
+                if (status === 'pending' && r.verified) return false;
+                if (status === 'verified' && (!r.verified || r.entered)) return false;
+                if (status === 'entered' && !r.entered) return false;
+                if (role !== 'all' && r.role !== role) return false;
+                if (search && r.name.toLowerCase().indexOf(search) === -1) return false;
+                return true;
+            });
+            if (filtered.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#87CEEB;">' + t.noData + '</td></tr>'; return; }
+            tbody.innerHTML = filtered.map(function(r) {
+                var sc = r.entered ? 'entered' : (r.verified ? 'verified' : 'pending');
+                var st = r.entered ? t.entered : (r.verified ? t.verified : t.pending);
+                var contact = r.email || r.phone || '-';
+                var btn = r.verified ? '<button class="verify-btn done">' + t.btnDone + '</button>' : '<button class="verify-btn approve" onclick="verifyReg(\'' + r.id + '\')">' + t.btnVerify + '</button>';
+                return '<tr><td><code style="font-size:0.75em;">' + r.id.slice(-10) + '</code></td><td>' + r.name + '</td><td><span class="role-badge ' + r.role + '">' + t[r.role] + '</span></td><td><span class="lottery-num">' + r.lottery_number + '</span></td><td style="font-size:0.8em;">' + contact + '</td><td><span class="status-badge ' + sc + '">' + st + '</span></td><td>' + btn + '</td></tr>';
+            }).join('');
+        }
+        
+        window.verifyReg = async function(id) {
+            try { await supabase.from('registrations').update({ verified: true }).eq('id', id); loadData(); } catch (e) { console.error(e); }
+        };
+        
+        async function verifyAll() {
+            if (!confirm(lang === 'it' ? 'Verificare tutti?' : '确认全部审核？')) return;
+            try { await supabase.from('registrations').update({ verified: true }).eq('verified', false); loadData(); } catch (e) { console.error(e); }
+        }
+        
+        function selectLanguage(l) { lang = l; $('langScreen').classList.add('hidden'); $('mainScreen').classList.remove('hidden'); updateUI(); loadData();
+            supabase.channel('admin').on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, function() { loadData(); }).subscribe();
+        }
+        
+        function exportCSV() {
+            var t = T[lang], rows = [['ID', t.thName, t.thRole, t.thLottery, 'Email', 'Phone', t.thStatus]];
+            allData.forEach(function(r) { rows.push([r.id, r.name, t[r.role], r.lottery_number, r.email || '', r.phone || '', r.entered ? t.entered : (r.verified ? t.verified : t.pending)]); });
+            var csv = rows.map(function(r) { return r.map(function(c) { return '"' + c + '"'; }).join(','); }).join('\n');
+            var blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement('a'); link.href = URL.createObjectURL(blob);
+            link.download = 'FDL2026_' + new Date().toISOString().slice(0, 10) + '.csv'; link.click();
+        }
+        
+        function exportExcel() {
+            var t = T[lang], data = allData.map(function(r) { return { ID: r.id, [t.thName]: r.name, [t.thRole]: t[r.role], [t.thLottery]: r.lottery_number, Email: r.email || '', Phone: r.phone || '', [t.thStatus]: r.entered ? t.entered : (r.verified ? t.verified : t.pending) }; });
+            var ws = XLSX.utils.json_to_sheet(data), wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Registrations');
+            XLSX.writeFile(wb, 'FDL2026_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+        }
+        
+        function openLottery() { $('lotteryModal').classList.add('show'); $('lotteryDisplay').textContent = '----'; $('winnerInfo').style.display = 'none'; }
+        function closeLottery() { $('lotteryModal').classList.remove('show'); }
+        
+        function drawLottery() {
+            var t = T[lang], eligible = allData.filter(function(r) { return r.verified; });
+            if (eligible.length === 0) { alert(lang === 'it' ? 'Nessun verificato!' : '没有已审核的！'); return; }
+            var d = $('lotteryDisplay'), count = 0;
+            var iv = setInterval(function() { d.textContent = String(Math.floor(1000 + Math.random() * 9000)); count++;
+                if (count >= 25) { clearInterval(iv); var w = eligible[Math.floor(Math.random() * eligible.length)];
+                    d.textContent = w.lottery_number; $('winnerInfo').style.display = 'block'; $('winnerName').textContent = w.name + ' (' + t[w.role] + ')';
+                }
+            }, 80);
+        }
+        
+        $('btnLangIt').addEventListener('click', function() { selectLanguage('it'); });
+        $('btnLangZh').addEventListener('click', function() { selectLanguage('zh'); });
+        $('switchIt').addEventListener('click', function() { lang = 'it'; updateUI(); renderTable(); });
+        $('switchZh').addEventListener('click', function() { lang = 'zh'; updateUI(); renderTable(); });
+        $('btnVerifyAll').addEventListener('click', verifyAll);
+        $('btnCsv').addEventListener('click', exportCSV);
+        $('btnExcel').addEventListener('click', exportExcel);
+        $('btnRefresh').addEventListener('click', loadData);
+        $('btnLottery').addEventListener('click', openLottery);
+        $('btnDraw').addEventListener('click', drawLottery);
+        $('btnClose').addEventListener('click', closeLottery);
+        $('filterStatus').addEventListener('change', renderTable);
+        $('filterRole').addEventListener('change', renderTable);
+        $('filterSearch').addEventListener('input', renderTable);
+    })();
+    </script>
+</body>
+</html>

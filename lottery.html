@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lottery Draw | 抽奖</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            background: radial-gradient(ellipse at center, #1a0a0a 0%, #0d0d0d 100%);
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        .lang-switch { position: fixed; top: 20px; right: 20px; display: flex; gap: 10px; z-index: 100; }
+        .lang-switch button { padding: 15px 25px; border: 2px solid #ffd700; background: rgba(255, 215, 0, 0.2); color: #ffd700; border-radius: 10px; cursor: pointer; font-size: 1.2em; }
+        .lang-switch button.active { background: #ffd700; color: #0d0d0d; }
+        
+        .container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            position: relative;
+        }
+        
+        /* Animated background lanterns */
+        .bg-lantern {
+            position: absolute;
+            font-size: 8em;
+            opacity: 0.1;
+            animation: floatLantern 10s ease-in-out infinite;
+        }
+        .bg-lantern:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
+        .bg-lantern:nth-child(2) { top: 20%; right: 15%; animation-delay: 2s; }
+        .bg-lantern:nth-child(3) { bottom: 15%; left: 20%; animation-delay: 4s; }
+        .bg-lantern:nth-child(4) { bottom: 25%; right: 10%; animation-delay: 6s; }
+        @keyframes floatLantern {
+            0%, 100% { transform: translateY(0) rotate(-5deg); }
+            50% { transform: translateY(-30px) rotate(5deg); }
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            z-index: 10;
+        }
+        .header h1 {
+            font-size: 4em;
+            color: #ffd700;
+            text-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+            margin-bottom: 10px;
+        }
+        .header h2 {
+            font-size: 2em;
+            color: #ff6b35;
+        }
+        
+        .lottery-display {
+            background: linear-gradient(145deg, rgba(26, 10, 10, 0.9), rgba(45, 21, 21, 0.9));
+            border: 8px solid #ffd700;
+            border-radius: 40px;
+            padding: 60px 100px;
+            text-align: center;
+            box-shadow: 0 0 100px rgba(255, 215, 0, 0.3), inset 0 0 50px rgba(255, 215, 0, 0.1);
+            z-index: 10;
+            min-width: 600px;
+        }
+        
+        .lottery-label {
+            font-size: 2em;
+            color: #87CEEB;
+            margin-bottom: 20px;
+        }
+        
+        .lottery-number {
+            font-size: 12em;
+            font-weight: bold;
+            color: #ffd700;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 50px rgba(255, 215, 0, 0.8);
+            letter-spacing: 30px;
+            line-height: 1;
+            transition: all 0.1s ease;
+        }
+        .lottery-number.spinning {
+            animation: pulse 0.15s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        .winner-info {
+            margin-top: 40px;
+            padding: 30px;
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(46, 125, 50, 0.2));
+            border: 4px solid #4CAF50;
+            border-radius: 20px;
+            display: none;
+        }
+        .winner-info.show { display: block; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .winner-info h3 {
+            font-size: 2em;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+        .winner-name {
+            font-size: 3em;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        
+        .controls {
+            margin-top: 50px;
+            display: flex;
+            gap: 30px;
+            z-index: 10;
+        }
+        
+        .btn {
+            padding: 25px 60px;
+            font-size: 1.8em;
+            font-weight: bold;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn:hover { transform: scale(1.1); }
+        .btn:active { transform: scale(0.95); }
+        
+        .btn-draw {
+            background: linear-gradient(135deg, #f44336, #c62828);
+            color: #fff;
+            box-shadow: 0 10px 40px rgba(244, 67, 54, 0.4);
+        }
+        .btn-draw:hover { box-shadow: 0 15px 50px rgba(244, 67, 54, 0.6); }
+        
+        .btn-reset {
+            background: linear-gradient(135deg, #607D8B, #455A64);
+            color: #fff;
+        }
+        
+        .stats-bar {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 50px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px 50px;
+            border-radius: 20px;
+            border: 2px solid rgba(255, 215, 0, 0.3);
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-item .number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .stat-item .label {
+            font-size: 1em;
+            color: #87CEEB;
+        }
+        
+        .fullscreen-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+            border: none;
+            color: #fff;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1.2em;
+            z-index: 100;
+        }
+        
+        /* Confetti */
+        .confetti {
+            position: fixed;
+            width: 15px;
+            height: 15px;
+            top: -20px;
+            animation: confettiFall 3s ease-in forwards;
+        }
+        @keyframes confettiFall {
+            to { top: 110%; transform: rotate(720deg); }
+        }
+        
+        .history-panel {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 3px solid #ffd700;
+            border-radius: 20px;
+            padding: 25px;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+            z-index: 50;
+            min-width: 320px;
+            width: 350px;
+        }
+        .history-panel h4 {
+            color: #ffd700;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            text-align: center;
+        }
+        .history-item {
+            padding: 15px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            font-size: 1.1em;
+            background: rgba(255, 215, 0, 0.05);
+            margin-bottom: 10px;
+            border-radius: 10px;
+        }
+        .history-item:last-child { border-bottom: none; margin-bottom: 0; }
+        .history-item .num { color: #ffd700; font-weight: bold; font-size: 1.6em; }
+        .history-item .name { color: #fff; margin-top: 8px; font-size: 1.2em; }
+        
+        .winner-list-section {
+            display: none;
+            margin-top: 40px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 4px solid #ffd700;
+            border-radius: 25px;
+            padding: 35px 60px;
+            max-width: 1100px;
+            width: 90%;
+            z-index: 10;
+        }
+        .winner-list-section.show { display: block; animation: fadeIn 0.5s ease; }
+        .winner-list-section h3 {
+            color: #ffd700;
+            font-size: 2.5em;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+        .winner-table {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .winner-row {
+            display: flex;
+            align-items: center;
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 152, 0, 0.1));
+            border: 3px solid rgba(255, 215, 0, 0.5);
+            border-radius: 15px;
+            padding: 20px 30px;
+            min-width: 300px;
+            transition: transform 0.3s ease;
+        }
+        .winner-row:hover { transform: scale(1.05); }
+        .winner-row .series {
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            color: #0d0d0d;
+            font-size: 1.8em;
+            font-weight: bold;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 25px;
+            flex-shrink: 0;
+        }
+        .winner-row .info {
+            flex: 1;
+        }
+        .winner-row .lottery-num {
+            color: #ffd700;
+            font-size: 2.2em;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+        .winner-row .winner-name-small {
+            color: #fff;
+            font-size: 1.4em;
+            margin-top: 8px;
+        }
+        
+        @media (max-width: 800px) {
+            .lottery-display { padding: 30px 50px; min-width: auto; }
+            .lottery-number { font-size: 6em; letter-spacing: 15px; }
+            .header h1 { font-size: 2.5em; }
+            .btn { padding: 15px 30px; font-size: 1.2em; }
+            .controls { flex-direction: column; }
+            .history-panel { 
+                position: fixed;
+                top: auto;
+                bottom: 100px;
+                left: 10px;
+                right: 10px;
+                width: auto;
+                min-width: auto;
+                max-height: 200px;
+            }
+            .winner-list-section { padding: 20px 25px; }
+            .winner-list-section h3 { font-size: 1.5em; }
+            .winner-row { min-width: 100%; }
+            .winner-row .series { width: 40px; height: 40px; font-size: 1.2em; }
+            .winner-row .lottery-num { font-size: 1.4em; }
+        }
+        
+        @media (min-width: 801px) {
+            .history-panel { display: block; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-lantern">🏮</div>
+    <div class="bg-lantern">🏮</div>
+    <div class="bg-lantern">🏮</div>
+    <div class="bg-lantern">🏮</div>
+    
+    <div class="lang-switch">
+        <button id="switchIt">🇮🇹 IT</button>
+        <button id="switchZh">🇨🇳 中文</button>
+    </div>
+    
+    <button class="fullscreen-btn" id="btnFullscreen">⛶ Fullscreen</button>
+    
+    <div class="history-panel" id="historyPanel">
+        <h4 id="lblHistory">🏆 Vincitori</h4>
+        <div id="historyList"></div>
+    </div>
+    
+    <div class="container">
+        <div class="header">
+            <h1 id="headerTitle">🎯 Estrazione Lotteria</h1>
+            <h2 id="headerSub">Festa delle Lanterne 2026</h2>
+        </div>
+        
+        <div class="lottery-display">
+            <div class="lottery-label" id="lblNumber">Numero Estratto</div>
+            <div class="lottery-number" id="lotteryNumber">----</div>
+            
+            <div class="winner-info" id="winnerInfo">
+                <h3 id="lblWinner">🎉 Vincitore!</h3>
+                <div class="winner-name" id="winnerName">--</div>
+            </div>
+        </div>
+        
+        <div class="winner-list-section" id="winnerListSection">
+            <h3 id="lblWinnerList">🏆 Lista Vincitori</h3>
+            <div class="winner-table" id="winnerTable"></div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-draw" id="btnDraw">🎲 ESTRAI</button>
+            <button class="btn btn-reset" id="btnReset">↺</button>
+        </div>
+    </div>
+    
+    <div class="stats-bar">
+        <div class="stat-item">
+            <div class="number" id="statTotal">0</div>
+            <div class="label" id="lblTotal">Partecipanti</div>
+        </div>
+        <div class="stat-item">
+            <div class="number" id="statDrawn">0</div>
+            <div class="label" id="lblDrawn">Estratti</div>
+        </div>
+        <div class="stat-item">
+            <div class="number" id="statRemaining">0</div>
+            <div class="label" id="lblRemaining">Rimanenti</div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var SUPABASE_URL = 'https://mfwgfgjneeymavxgbwde.supabase.co';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1md2dmZ2puZWV5bWF2eGdid2RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTMzNzgsImV4cCI6MjA4Mzk4OTM3OH0.11Ww-TwArHnrM6Lw7q_ZbJu5tFLugsAq9jT6H6p42WE';
+        var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        var lang = 'it';
+        var allData = [];
+        var drawnList = [];
+        var isSpinning = false;
+        
+        var T = {
+            it: {
+                headerTitle: '🎯 Estrazione Lotteria',
+                headerSub: 'Festa delle Lanterne 2026',
+                lblNumber: 'Numero Estratto',
+                lblWinner: '🎉 Vincitore!',
+                lblWinnerList: '🏆 Lista Vincitori',
+                btnDraw: '🎲 ESTRAI',
+                lblHistory: '🏆 Vincitori',
+                lblTotal: 'Partecipanti',
+                lblDrawn: 'Estratti',
+                lblRemaining: 'Rimanenti',
+                noMore: 'Tutti estratti!'
+            },
+            zh: {
+                headerTitle: '🎯 抽奖',
+                headerSub: '2026 迎新春 闹元宵',
+                lblNumber: '中奖号码',
+                lblWinner: '🎉 获奖者！',
+                lblWinnerList: '🏆 获奖名单',
+                btnDraw: '🎲 抽奖',
+                lblHistory: '🏆 获奖名单',
+                lblTotal: '参与者',
+                lblDrawn: '已抽',
+                lblRemaining: '剩余',
+                noMore: '全部抽完！'
+            }
+        };
+        
+        var $ = function(id) { return document.getElementById(id); };
+        
+        function updateUI() {
+            var t = T[lang];
+            $('headerTitle').textContent = t.headerTitle;
+            $('headerSub').textContent = t.headerSub;
+            $('lblNumber').textContent = t.lblNumber;
+            $('lblWinner').textContent = t.lblWinner;
+            $('lblWinnerList').textContent = t.lblWinnerList;
+            $('btnDraw').textContent = t.btnDraw;
+            $('lblHistory').textContent = t.lblHistory;
+            $('lblTotal').textContent = t.lblTotal;
+            $('lblDrawn').textContent = t.lblDrawn;
+            $('lblRemaining').textContent = t.lblRemaining;
+            $('switchIt').classList.toggle('active', lang === 'it');
+            $('switchZh').classList.toggle('active', lang === 'zh');
+            updateWinnerList();
+        }
+        
+        async function loadData() {
+            try {
+                var { data } = await supabase.from('registrations').select('*').eq('verified', true);
+                allData = data || [];
+                updateStats();
+            } catch (e) { console.error(e); }
+        }
+        
+        function updateStats() {
+            var total = allData.length;
+            var drawn = drawnList.length;
+            var remaining = total - drawn;
+            $('statTotal').textContent = total;
+            $('statDrawn').textContent = drawn;
+            $('statRemaining').textContent = remaining;
+        }
+        
+        function draw() {
+            if (isSpinning) return;
+            
+            // Get eligible (not yet drawn)
+            var drawnIds = drawnList.map(function(d) { return d.id; });
+            var eligible = allData.filter(function(r) { return drawnIds.indexOf(r.id) === -1; });
+            
+            if (eligible.length === 0) {
+                alert(T[lang].noMore);
+                return;
+            }
+            
+            isSpinning = true;
+            $('winnerInfo').classList.remove('show');
+            $('lotteryNumber').classList.add('spinning');
+            
+            var display = $('lotteryNumber');
+            var count = 0;
+            var maxCount = 30 + Math.floor(Math.random() * 20);
+            
+            var interval = setInterval(function() {
+                var randomNum = String(Math.floor(1000 + Math.random() * 9000));
+                display.textContent = randomNum;
+                count++;
+                
+                if (count >= maxCount) {
+                    clearInterval(interval);
+                    
+                    // Select winner
+                    var winner = eligible[Math.floor(Math.random() * eligible.length)];
+                    display.textContent = winner.lottery_number;
+                    display.classList.remove('spinning');
+                    
+                    // Show winner info
+                    $('winnerName').textContent = winner.name;
+                    $('winnerInfo').classList.add('show');
+                    
+                    // Add to drawn list
+                    drawnList.push(winner);
+                    updateStats();
+                    updateHistory();
+                    
+                    // Confetti!
+                    createConfetti();
+                    
+                    isSpinning = false;
+                }
+            }, 80);
+        }
+        
+        function updateHistory() {
+            var html = drawnList.slice().reverse().map(function(w, i) {
+                return '<div class="history-item"><div class="num">#' + (drawnList.length - i) + ' ' + w.lottery_number + '</div><div class="name">' + w.name + '</div></div>';
+            }).join('');
+            $('historyList').innerHTML = html;
+            updateWinnerList();
+        }
+        
+        function updateWinnerList() {
+            if (drawnList.length === 0) {
+                $('winnerListSection').classList.remove('show');
+                return;
+            }
+            
+            $('winnerListSection').classList.add('show');
+            var html = drawnList.map(function(w, i) {
+                return '<div class="winner-row">' +
+                    '<div class="series">' + (i + 1) + '</div>' +
+                    '<div class="info">' +
+                        '<div class="lottery-num">' + w.lottery_number + '</div>' +
+                        '<div class="winner-name-small">' + w.name + '</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+            $('winnerTable').innerHTML = html;
+        }
+        
+        function reset() {
+            if (confirm(lang === 'it' ? 'Resettare tutti i risultati?' : '重置所有结果？')) {
+                drawnList = [];
+                $('lotteryNumber').textContent = '----';
+                $('winnerInfo').classList.remove('show');
+                $('winnerListSection').classList.remove('show');
+                $('historyList').innerHTML = '';
+                $('winnerTable').innerHTML = '';
+                updateStats();
+            }
+        }
+        
+        function createConfetti() {
+            var colors = ['#ffd700', '#ff6b35', '#4CAF50', '#2196F3', '#E91E63', '#9C27B0'];
+            for (var i = 0; i < 50; i++) {
+                var conf = document.createElement('div');
+                conf.className = 'confetti';
+                conf.style.left = Math.random() * 100 + '%';
+                conf.style.background = colors[Math.floor(Math.random() * colors.length)];
+                conf.style.animationDuration = (2 + Math.random() * 2) + 's';
+                conf.style.animationDelay = Math.random() * 0.5 + 's';
+                document.body.appendChild(conf);
+                setTimeout(function() { conf.remove(); }, 4000);
+            }
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        // Events
+        $('switchIt').addEventListener('click', function() { lang = 'it'; updateUI(); });
+        $('switchZh').addEventListener('click', function() { lang = 'zh'; updateUI(); });
+        $('btnDraw').addEventListener('click', draw);
+        $('btnReset').addEventListener('click', reset);
+        $('btnFullscreen').addEventListener('click', toggleFullscreen);
+        
+        // Keyboard shortcut: Space to draw
+        document.addEventListener('keydown', function(e) {
+            if (e.code === 'Space') { e.preventDefault(); draw(); }
+            if (e.code === 'KeyF') { toggleFullscreen(); }
+        });
+        
+        // Initialize
+        updateUI();
+        loadData();
+    })();
+    </script>
+</body>
+</html>

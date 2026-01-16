@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Festa delle Lanterne 2026 | 2026 迎新春 闹元宵</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a0a0a 0%, #2d1515 50%, #1a0a0a 100%);
+            color: #fff;
+        }
+        .container { max-width: 550px; margin: 0 auto; padding: 20px; }
+        
+        .lang-switch { position: fixed; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; }
+        .lang-switch button { padding: 8px 12px; border: 2px solid #c41e3a; background: rgba(196, 30, 58, 0.3); color: #ffd700; border-radius: 8px; cursor: pointer; }
+        .lang-switch button:hover { background: #c41e3a; }
+        .lang-switch button.active { background: #c41e3a; border-color: #ffd700; }
+        
+        .lang-screen { padding-top: 80px; text-align: center; }
+        .lang-screen h1 { font-size: 2.2em; color: #ffd700; text-shadow: 0 0 10px #ff6b35; margin-bottom: 10px; }
+        .lang-screen h2 { font-size: 1.8em; color: #ffd700; margin-bottom: 50px; }
+        .lang-selector { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .lang-btn { width: 260px; padding: 22px 45px; font-size: 20px; border: 3px solid #c41e3a; background: rgba(196, 30, 58, 0.2); color: #ffd700; border-radius: 15px; cursor: pointer; transition: all 0.3s ease; }
+        .lang-btn:hover { background: linear-gradient(135deg, #c41e3a, #8b0000); transform: scale(1.05); }
+        
+        .header { text-align: center; margin-bottom: 25px; }
+        .header h1 { font-size: 1.8em; color: #ffd700; text-shadow: 0 0 10px #ff6b35; margin-bottom: 15px; }
+        .event-info { background: rgba(255, 215, 0, 0.1); padding: 15px; border-radius: 10px; border: 1px solid rgba(255, 215, 0, 0.3); }
+        .event-info p { margin: 5px 0; font-size: 0.95em; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; padding: 14px; font-size: 1em; border: 2px solid #c41e3a; background: rgba(196, 30, 58, 0.2); color: #ffd700; border-radius: 10px; cursor: pointer; }
+        .tab-btn:hover, .tab-btn.active { background: linear-gradient(135deg, #c41e3a, #8b0000); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .form-container { background: rgba(45, 21, 21, 0.9); border-radius: 20px; padding: 25px; border: 2px solid #c41e3a; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 8px; color: #ffd700; font-size: 1.05em; }
+        .form-group label .required { color: #f44336; font-weight: bold; }
+        .form-group input { width: 100%; padding: 14px; font-size: 16px; border: 2px solid #8b0000; border-radius: 10px; background: rgba(0, 0, 0, 0.3); color: #fff; }
+        .form-group input:focus { outline: none; border-color: #ffd700; }
+        .form-group input.error { border-color: #f44336; }
+        .hint { font-size: 0.85em; color: #ffcc00; opacity: 0.8; margin-top: 5px; }
+        .error-msg { color: #f44336; font-size: 0.9em; margin-top: 5px; display: none; }
+        .error-msg.show { display: block; }
+        
+        .role-selector { display: flex; gap: 15px; }
+        .role-btn { flex: 1; padding: 20px 15px; border: 2px solid #8b0000; background: rgba(0, 0, 0, 0.3); color: #fff; border-radius: 12px; cursor: pointer; text-align: center; }
+        .role-btn:hover { border-color: #c41e3a; background: rgba(196, 30, 58, 0.2); }
+        .role-btn.selected { border-color: #ffd700; background: linear-gradient(135deg, #c41e3a, #8b0000); }
+        .role-btn .icon { font-size: 2.2em; margin-bottom: 8px; }
+        .role-btn .title { font-size: 1.1em; font-weight: bold; }
+        
+        .lottery-section { background: rgba(255, 215, 0, 0.1); border-radius: 12px; padding: 18px; margin-bottom: 18px; border: 1px solid rgba(255, 215, 0, 0.3); }
+        .lottery-section h3 { color: #ffd700; margin-bottom: 12px; text-align: center; }
+        .lottery-input-group { display: flex; gap: 10px; }
+        .lottery-input-group input { flex: 1; text-align: center; font-size: 26px; letter-spacing: 10px; font-weight: bold; }
+        .lottery-btn { padding: 12px 18px; background: linear-gradient(135deg, #c41e3a, #8b0000); border: none; color: #fff; border-radius: 10px; cursor: pointer; font-size: 1.1em; }
+        .lottery-status { text-align: center; padding: 10px; border-radius: 8px; margin-top: 12px; }
+        .lottery-status.available { background: rgba(46, 125, 50, 0.3); border: 1px solid #4caf50; color: #4caf50; }
+        .lottery-status.taken { background: rgba(244, 67, 54, 0.3); border: 1px solid #f44336; color: #f44336; }
+        .lottery-status.checking { background: rgba(33, 150, 243, 0.3); border: 1px solid #2196F3; color: #2196F3; }
+        
+        .remember-section { margin: 18px 0; padding: 12px; background: rgba(255, 215, 0, 0.05); border-radius: 8px; border: 1px dashed rgba(255, 215, 0, 0.3); }
+        .remember-section label { display: flex; align-items: center; gap: 10px; cursor: pointer; color: #ffcc00; font-size: 0.9em; }
+        .remember-section input[type="checkbox"] { width: 20px; height: 20px; accent-color: #ffd700; }
+        
+        .submit-btn { width: 100%; padding: 16px; font-size: 1.15em; background: linear-gradient(135deg, #ffd700, #ff8c00); border: none; border-radius: 12px; color: #1a0a0a; font-weight: bold; cursor: pointer; }
+        .submit-btn:hover { transform: scale(1.02); box-shadow: 0 0 25px rgba(255, 215, 0, 0.5); }
+        
+        .pending-section { display: none; text-align: center; }
+        .pending-section.show { display: block; }
+        .pending-box { background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 152, 0, 0.2)); border: 3px solid #FFC107; border-radius: 15px; padding: 30px; margin-bottom: 20px; }
+        .pending-box .icon { font-size: 4em; margin-bottom: 15px; }
+        .pending-box h2 { color: #FFC107; margin-bottom: 10px; }
+        .pending-box p { color: #FFE082; line-height: 1.6; }
+        .reg-id-box { background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 10px; margin: 20px 0; }
+        .reg-id-box .label { color: #87CEEB; font-size: 0.9em; margin-bottom: 5px; }
+        .reg-id-box .value { color: #ffd700; font-size: 1.2em; font-weight: bold; font-family: monospace; }
+        
+        .result-section { display: none; text-align: center; }
+        .result-section.show { display: block; }
+        .success-box { background: linear-gradient(135deg, rgba(46, 125, 50, 0.3), rgba(27, 94, 32, 0.3)); border: 3px solid #4caf50; border-radius: 15px; padding: 25px; margin-bottom: 20px; }
+        .success-box h2 { color: #4caf50; margin-bottom: 8px; }
+        .success-box p { color: #a5d6a7; }
+        .timestamp-box { background: rgba(33, 150, 243, 0.15); border: 2px solid #2196F3; border-radius: 10px; padding: 15px; margin: 15px 0; }
+        .timestamp-box .label { color: #87CEEB; font-size: 0.9em; margin-bottom: 5px; }
+        .timestamp-box .time { color: #fff; font-size: 1.2em; font-weight: bold; font-family: monospace; }
+        .qr-container { background: #fff; padding: 20px; border-radius: 12px; display: inline-block; margin: 15px 0; }
+        .ticket-details { background: rgba(255, 215, 0, 0.1); border-radius: 12px; padding: 20px; margin: 15px 0; text-align: left; border: 1px solid rgba(255, 215, 0, 0.3); }
+        .ticket-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .ticket-row:last-child { border-bottom: none; }
+        .ticket-row .label { color: #87CEEB; }
+        .ticket-row .value { color: #fff; font-weight: bold; text-align: right; max-width: 60%; }
+        .ticket-row.highlight .value { color: #ffd700; font-size: 1.4em; }
+        
+        .action-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 15px; }
+        .action-btn { padding: 14px 25px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; font-size: 1em; }
+        .action-btn:hover { transform: scale(1.05); }
+        .download-btn { background: linear-gradient(135deg, #4caf50, #2e7d32); color: #fff; }
+        .pdf-btn { background: linear-gradient(135deg, #f44336, #c62828); color: #fff; }
+        .back-btn { background: linear-gradient(135deg, #2196F3, #1565C0); color: #fff; }
+        
+        .status-result { margin-top: 20px; display: none; }
+        .status-result.show { display: block; }
+        .status-pending { background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 152, 0, 0.2)); border: 2px solid #FFC107; border-radius: 12px; padding: 25px; text-align: center; }
+        .status-pending h3 { color: #FFC107; margin-bottom: 10px; font-size: 1.3em; }
+        .status-not-found { background: linear-gradient(135deg, rgba(244, 67, 54, 0.2), rgba(183, 28, 28, 0.2)); border: 2px solid #f44336; border-radius: 12px; padding: 25px; text-align: center; }
+        .status-not-found h3 { color: #f44336; }
+        
+        .loading { display: none; text-align: center; padding: 40px; }
+        .loading.show { display: block; }
+        .spinner { width: 45px; height: 45px; border: 4px solid rgba(255, 215, 0, 0.3); border-top-color: #ffd700; border-radius: 50%; margin: 0 auto 15px; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 999; }
+        .modal-overlay.show { display: flex; justify-content: center; align-items: center; }
+        .modal-box { background: linear-gradient(135deg, #2d1515, #1a0a0a); border: 3px solid #FFC107; border-radius: 15px; padding: 25px; max-width: 380px; width: 90%; text-align: center; }
+        .modal-box h3 { color: #FFC107; margin-bottom: 12px; }
+        .modal-box p { margin-bottom: 18px; line-height: 1.5; }
+        .modal-box button { padding: 10px 35px; background: linear-gradient(135deg, #c41e3a, #8b0000); border: none; color: #fff; border-radius: 8px; cursor: pointer; }
+        
+        .hidden { display: none !important; }
+        @media (max-width: 480px) { .role-selector, .lottery-input-group, .action-buttons, .tabs { flex-direction: column; } .action-btn { width: 100%; } }
+    </style>
+</head>
+<body>
+    <div class="lang-switch">
+        <button id="switchIt">🇮🇹 IT</button>
+        <button id="switchZh">🇨🇳 中文</button>
+    </div>
+    
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-box">
+            <h3 id="modalTitle">⚠️</h3>
+            <p id="modalMsg"></p>
+            <button id="modalBtn">OK</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="lang-screen" id="langScreen">
+            <h1>🏮 Festa delle Lanterne 2026</h1>
+            <h2>2026 迎新春 闹元宵</h2>
+            <div class="lang-selector">
+                <button class="lang-btn" id="btnLangIt">🇮🇹 Italiano</button>
+                <button class="lang-btn" id="btnLangZh">🇨🇳 中文</button>
+            </div>
+        </div>
+        
+        <div id="mainScreen" class="hidden">
+            <div class="header">
+                <h1 id="headerTitle">🏮 Festa delle Lanterne 2026 🏮</h1>
+                <div class="event-info">
+                    <p>📍 <strong>Piazzale Michelangelo, Firenze</strong></p>
+                    <p>📅 <strong>01/03/2026</strong></p>
+                </div>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab-btn active" id="tabRegister">📝</button>
+                <button class="tab-btn" id="tabCheck">🔍</button>
+            </div>
+            
+            <!-- REGISTER TAB -->
+            <div class="tab-content active" id="registerTab">
+                <div class="form-container" id="regForm">
+                    <div class="form-group">
+                        <label id="lblRole">Seleziona il tuo ruolo <span class="required">*</span></label>
+                        <div class="role-selector">
+                            <div class="role-btn" id="roleVisitor">
+                                <div class="icon">👤</div>
+                                <div class="title" id="txtVisitor">Visitatore</div>
+                            </div>
+                            <div class="role-btn" id="roleStaff">
+                                <div class="icon">👷</div>
+                                <div class="title" id="txtStaff">Staff</div>
+                            </div>
+                        </div>
+                        <p class="error-msg" id="errRole">Seleziona un ruolo</p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label id="lblName">Nome Completo <span class="required">*</span></label>
+                        <input type="text" id="inputName" placeholder="">
+                        <p class="error-msg" id="errName">Il nome è obbligatorio</p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label id="lblEmail">Email</label>
+                        <input type="email" id="inputEmail" placeholder="email@esempio.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label id="lblPhone">Telefono</label>
+                        <input type="tel" id="inputPhone" placeholder="+39 xxx xxx xxxx">
+                        <p class="hint" id="hintContact">* Almeno email o telefono richiesto</p>
+                        <p class="error-msg" id="errContact">Inserisci almeno email o telefono</p>
+                    </div>
+                    
+                    <div class="remember-section">
+                        <label>
+                            <input type="checkbox" id="rememberMe" checked>
+                            <span id="lblRemember">Ricorda i miei dati</span>
+                        </label>
+                    </div>
+                    
+                    <div class="lottery-section">
+                        <h3 id="lblLottery">🎯 Numero Lotteria</h3>
+                        <p class="hint" style="text-align:center;margin-bottom:12px;" id="hintLottery">Scegli 4 cifre o genera casualmente</p>
+                        <div class="lottery-input-group">
+                            <input type="text" id="inputLottery" maxlength="4" placeholder="8888">
+                            <button type="button" class="lottery-btn" id="btnCheckLottery">✓</button>
+                            <button type="button" class="lottery-btn" id="btnRandomLottery">🎲</button>
+                        </div>
+                        <div class="lottery-status" id="lotteryStatus" style="display:none;"></div>
+                    </div>
+                    
+                    <button class="submit-btn" id="btnSubmit">📝</button>
+                </div>
+                
+                <div class="loading" id="loadingReg">
+                    <div class="spinner"></div>
+                    <p id="loadingText">Elaborazione...</p>
+                </div>
+                
+                <div class="pending-section" id="pendingSection">
+                    <div class="pending-box">
+                        <div class="icon">⏳</div>
+                        <h2 id="pendingTitle">In Attesa di Verifica</h2>
+                        <p id="pendingMsg">La tua registrazione è stata inviata. Attendi l'approvazione dello staff.</p>
+                    </div>
+                    <div class="reg-id-box">
+                        <div class="label" id="lblRegId">ID Registrazione</div>
+                        <div class="value" id="pendingRegId">--</div>
+                    </div>
+                    <div class="reg-id-box">
+                        <div class="label" id="lblLotteryNum">Numero Lotteria</div>
+                        <div class="value" id="pendingLottery" style="color:#ffd700;font-size:1.5em;">--</div>
+                    </div>
+                    <p style="color:#87CEEB;margin:20px 0;" id="pendingHint">Usa "🔍 Verifica" per controllare lo stato</p>
+                    <button class="action-btn back-btn" id="btnGoCheck">🔍</button>
+                    <button class="action-btn" style="background:#666;color:#fff;margin-left:10px;" id="btnNewReg">➕</button>
+                </div>
+            </div>
+            
+            <!-- CHECK STATUS TAB -->
+            <div class="tab-content" id="checkTab">
+                <div class="form-container">
+                    <h3 style="color:#ffd700;margin-bottom:20px;text-align:center;" id="checkTitle">Verifica Stato Registrazione</h3>
+                    <div class="form-group">
+                        <label id="lblCheckName">Nome <span class="required">*</span></label>
+                        <input type="text" id="checkName" placeholder="">
+                    </div>
+                    <div class="form-group">
+                        <label id="lblCheckContact">Email o Telefono <span class="required">*</span></label>
+                        <input type="text" id="checkContact" placeholder="">
+                    </div>
+                    <button class="submit-btn" id="btnCheckStatus">🔍</button>
+                </div>
+                
+                <div class="loading" id="loadingCheck">
+                    <div class="spinner"></div>
+                    <p>...</p>
+                </div>
+                
+                <div class="status-result" id="statusResult"></div>
+                
+                <div class="result-section" id="resultSection">
+                    <div class="success-box">
+                        <h2 id="successTitle">✅ Approvato!</h2>
+                        <p id="successSubtitle">Il tuo biglietto è pronto</p>
+                    </div>
+                    <div class="timestamp-box">
+                        <div class="label" id="lblTimestamp">Registrato il</div>
+                        <div class="time" id="regTimestamp">--</div>
+                    </div>
+                    <div class="qr-container"><div id="qrcode"></div></div>
+                    <div class="ticket-details" id="ticketDetails"></div>
+                    <div class="action-buttons">
+                        <button class="action-btn download-btn" id="btnDownloadPng">📥 PNG</button>
+                        <button class="action-btn pdf-btn" id="btnDownloadPdf">📄 PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var SUPABASE_URL = 'https://mfwgfgjneeymavxgbwde.supabase.co';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1md2dmZ2puZWV5bWF2eGdid2RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTMzNzgsImV4cCI6MjA4Mzk4OTM3OH0.11Ww-TwArHnrM6Lw7q_ZbJu5tFLugsAq9jT6H6p42WE';
+        var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        var lang = 'it', selectedRole = '', lotteryVerified = false, currentReg = {};
+        
+        // EVENT DATE: 01/03/2026, Staff 14:00, Visitors 15:00
+        var EVENT_DATE = '01/03/2026';
+        var STAFF_TIME = '14:00';
+        var VISITOR_TIME = '15:00';
+        
+        var T = {
+            it: {
+                headerTitle: '🏮 Festa delle Lanterne 2026 🏮',
+                tabRegister: '📝 Registrazione', tabCheck: '🔍 Verifica',
+                lblRole: 'Seleziona il tuo ruolo', txtVisitor: 'Visitatore', txtStaff: 'Staff', errRole: 'Seleziona un ruolo',
+                lblName: 'Nome Completo', phName: 'Inserisci il tuo nome', errName: 'Il nome è obbligatorio',
+                lblEmail: 'Email', lblPhone: 'Telefono', hintContact: '* Almeno email o telefono', errContact: 'Inserisci email o telefono',
+                lblRemember: 'Ricorda i miei dati', lblLottery: '🎯 Numero Lotteria', hintLottery: 'Inserisci i tuoi 4 numeri preferiti o assegna casualmente',
+                btnSubmit: '📝 INVIA', loadingText: 'Invio...',
+                pendingTitle: '⏳ In Attesa di Approvazione', pendingMsg: 'La tua registrazione è stata inviata. Attendi l\'approvazione.',
+                lblRegId: 'ID Registrazione', lblLotteryNum: 'Numero Lotteria', pendingHint: 'Usa "🔍 Verifica" per controllare',
+                checkTitle: 'Verifica Stato', lblCheckName: 'Nome', lblCheckContact: 'Email o Telefono', btnCheckStatus: '🔍 VERIFICA',
+                statusPending: '⏳ In Attesa', statusPendingMsg: 'La tua registrazione è in attesa di approvazione.',
+                statusNotFound: '❌ Non Trovato', statusNotFoundMsg: 'Nessuna registrazione trovata.',
+                successTitle: '✅ Approvato!', successSubtitle: 'Ecco il tuo biglietto',
+                lblTimestamp: 'Registrato il', lotteryAvailable: '✅ Disponibile', lotteryTaken: '❌ Già usato', lotteryChecking: '⏳...', lotteryInvalid: '❌ 4 cifre',
+                ticketId: 'ID', ticketName: 'Nome', ticketRole: 'Ruolo', ticketDate: 'Data', ticketTime: 'Orario', ticketLottery: 'Lotteria', ticketRegTime: 'Registrato',
+                visitor: 'Visitatore', staff: 'Staff',
+                alertDuplicate: '⚠️ Già Registrato', alertDuplicateMsg: 'Usa "Verifica" per controllare lo stato.',
+                alertError: '❌ Errore', alertErrorMsg: 'Riprova più tardi.',
+                pdfTitle: 'BIGLIETTO', pdfEvent: 'Festa delle Lanterne 2026'
+            },
+            zh: {
+                headerTitle: '🏮 2026 迎新春 闹元宵 🏮',
+                tabRegister: '📝 注册', tabCheck: '🔍 查询',
+                lblRole: '选择角色', txtVisitor: '访客', txtStaff: '工作人员', errRole: '请选择角色',
+                lblName: '姓名', phName: '请输入全名', errName: '姓名必填',
+                lblEmail: '邮箱', lblPhone: '电话', hintContact: '* 至少填一项', errContact: '请填写邮箱或电话',
+                lblRemember: '记住信息', lblLottery: '🎯 抽奖号码', hintLottery: '输入自己心爱的四位数字或者随机分配',
+                btnSubmit: '📝 提交', loadingText: '提交中...',
+                pendingTitle: '⏳ 等待审核', pendingMsg: '您的注册已提交，请等待审核。',
+                lblRegId: '注册ID', lblLotteryNum: '抽奖号码', pendingHint: '用"🔍 查询"查看状态',
+                checkTitle: '查询状态', lblCheckName: '姓名', lblCheckContact: '邮箱或电话', btnCheckStatus: '🔍 查询',
+                statusPending: '⏳ 等待审核', statusPendingMsg: '您的注册正在等待审核。',
+                statusNotFound: '❌ 未找到', statusNotFoundMsg: '未找到注册记录。',
+                successTitle: '✅ 已通过！', successSubtitle: '这是您的门票',
+                lblTimestamp: '注册时间', lotteryAvailable: '✅ 可用', lotteryTaken: '❌ 已用', lotteryChecking: '⏳...', lotteryInvalid: '❌ 4位数',
+                ticketId: 'ID', ticketName: '姓名', ticketRole: '角色', ticketDate: '日期', ticketTime: '时间', ticketLottery: '抽奖号', ticketRegTime: '注册时间',
+                visitor: '访客', staff: '工作人员',
+                alertDuplicate: '⚠️ 已注册', alertDuplicateMsg: '请用"查询"查看状态。',
+                alertError: '❌ 错误', alertErrorMsg: '请稍后重试。',
+                pdfTitle: '入场券', pdfEvent: '2026 迎新春 闹元宵'
+            }
+        };
+        
+        var $ = function(id) { return document.getElementById(id); };
+        
+        function showModal(t, m) { $('modalTitle').textContent = t; $('modalMsg').textContent = m; $('modalOverlay').classList.add('show'); }
+        function hideModal() { $('modalOverlay').classList.remove('show'); }
+        
+        function updateUI() {
+            var t = T[lang];
+            $('headerTitle').textContent = t.headerTitle;
+            $('tabRegister').textContent = t.tabRegister; $('tabCheck').textContent = t.tabCheck;
+            $('lblRole').innerHTML = t.lblRole + ' <span class="required">*</span>';
+            $('txtVisitor').textContent = t.txtVisitor; $('txtStaff').textContent = t.txtStaff; $('errRole').textContent = t.errRole;
+            $('lblName').innerHTML = t.lblName + ' <span class="required">*</span>'; $('inputName').placeholder = t.phName; $('errName').textContent = t.errName;
+            $('lblEmail').textContent = t.lblEmail; $('lblPhone').textContent = t.lblPhone;
+            $('hintContact').textContent = t.hintContact; $('errContact').textContent = t.errContact;
+            $('lblRemember').textContent = t.lblRemember; $('lblLottery').textContent = t.lblLottery; $('hintLottery').textContent = t.hintLottery;
+            $('btnSubmit').textContent = t.btnSubmit; $('loadingText').textContent = t.loadingText;
+            $('pendingTitle').textContent = t.pendingTitle; $('pendingMsg').textContent = t.pendingMsg;
+            $('lblRegId').textContent = t.lblRegId; $('lblLotteryNum').textContent = t.lblLotteryNum; $('pendingHint').textContent = t.pendingHint;
+            $('checkTitle').textContent = t.checkTitle;
+            $('lblCheckName').innerHTML = t.lblCheckName + ' <span class="required">*</span>';
+            $('lblCheckContact').innerHTML = t.lblCheckContact + ' <span class="required">*</span>';
+            $('checkName').placeholder = t.phName; $('btnCheckStatus').textContent = t.btnCheckStatus;
+            $('successTitle').textContent = t.successTitle; $('successSubtitle').textContent = t.successSubtitle;
+            $('lblTimestamp').textContent = t.lblTimestamp;
+            $('switchIt').classList.toggle('active', lang === 'it'); $('switchZh').classList.toggle('active', lang === 'zh');
+        }
+        
+        function selectLanguage(l) { lang = l; $('langScreen').classList.add('hidden'); $('mainScreen').classList.remove('hidden'); updateUI(); loadUserInfo(); }
+        function switchLanguage(l) { lang = l; updateUI(); }
+        function selectRole(r) { selectedRole = r; $('roleVisitor').classList.toggle('selected', r === 'visitor'); $('roleStaff').classList.toggle('selected', r === 'staff'); $('errRole').classList.remove('show'); }
+        function switchTab(tab) { $('tabRegister').classList.toggle('active', tab === 'register'); $('tabCheck').classList.toggle('active', tab === 'check'); $('registerTab').classList.toggle('active', tab === 'register'); $('checkTab').classList.toggle('active', tab === 'check'); if (tab === 'check') { $('statusResult').classList.remove('show'); $('resultSection').classList.remove('show'); } }
+        
+        function saveUserInfo() { if ($('rememberMe').checked) try { localStorage.setItem('lanternUser2026', JSON.stringify({ name: $('inputName').value.trim(), email: $('inputEmail').value.trim(), phone: $('inputPhone').value.trim(), role: selectedRole })); } catch(e) {} }
+        function loadUserInfo() { try { var i = localStorage.getItem('lanternUser2026'); if (i) { i = JSON.parse(i); if (i.name) { $('inputName').value = i.name; $('checkName').value = i.name; } if (i.email) { $('inputEmail').value = i.email; $('checkContact').value = i.email; } if (i.phone) { $('inputPhone').value = i.phone; if (!i.email) $('checkContact').value = i.phone; } if (i.role) { selectedRole = i.role; $('roleVisitor').classList.toggle('selected', i.role === 'visitor'); $('roleStaff').classList.toggle('selected', i.role === 'staff'); } } } catch(e) {} }
+        
+        async function checkLottery() {
+            var num = $('inputLottery').value.replace(/\D/g, '').slice(0, 4); $('inputLottery').value = num;
+            var s = $('lotteryStatus'), t = T[lang];
+            if (num.length !== 4) { s.style.display = 'block'; s.className = 'lottery-status taken'; s.textContent = t.lotteryInvalid; lotteryVerified = false; return; }
+            s.style.display = 'block'; s.className = 'lottery-status checking'; s.textContent = t.lotteryChecking;
+            try { var { data } = await supabase.from('registrations').select('id').eq('lottery_number', num);
+                if (data && data.length > 0) { s.className = 'lottery-status taken'; s.textContent = t.lotteryTaken; lotteryVerified = false; }
+                else { s.className = 'lottery-status available'; s.textContent = t.lotteryAvailable; lotteryVerified = true; }
+            } catch (e) { s.className = 'lottery-status available'; s.textContent = t.lotteryAvailable; lotteryVerified = true; }
+        }
+        
+        async function randomLottery() {
+            var s = $('lotteryStatus'), t = T[lang]; s.style.display = 'block'; s.className = 'lottery-status checking'; s.textContent = t.lotteryChecking;
+            try { var { data } = await supabase.from('registrations').select('lottery_number');
+                var used = (data || []).map(function(r) { return r.lottery_number; }); var num, a = 0;
+                do { num = String(Math.floor(1000 + Math.random() * 9000)); a++; } while (used.indexOf(num) !== -1 && a < 100);
+                $('inputLottery').value = num; s.className = 'lottery-status available'; s.textContent = t.lotteryAvailable; lotteryVerified = true;
+            } catch (e) { $('inputLottery').value = String(Math.floor(1000 + Math.random() * 9000)); s.className = 'lottery-status available'; s.textContent = t.lotteryAvailable; lotteryVerified = true; }
+        }
+        
+        async function checkDuplicate(name, email, phone) {
+            try { var { data } = await supabase.from('registrations').select('id, name, email, phone'); if (!data) return false;
+                var nL = name.toLowerCase().trim(), eL = email ? email.toLowerCase().trim() : null, pC = phone ? phone.replace(/\D/g, '') : null;
+                for (var i = 0; i < data.length; i++) { var r = data[i], rN = r.name ? r.name.toLowerCase().trim() : '', rE = r.email ? r.email.toLowerCase().trim() : null, rP = r.phone ? r.phone.replace(/\D/g, '') : null;
+                    if (rN !== nL) continue;
+                    if (eL && pC) { if (rE === eL && rP === pC) return true; }
+                    else if (eL) { if (rE === eL) return true; }
+                    else if (pC) { if (rP === pC) return true; }
+                } return false;
+            } catch (e) { return false; }
+        }
+        
+        async function submitRegistration() {
+            var t = T[lang];
+            $('errRole').classList.remove('show'); $('errName').classList.remove('show'); $('errContact').classList.remove('show'); $('inputName').classList.remove('error');
+            if (!selectedRole) { $('errRole').classList.add('show'); return; }
+            var name = $('inputName').value.trim(); if (!name) { $('errName').classList.add('show'); $('inputName').classList.add('error'); return; }
+            var email = $('inputEmail').value.trim().toLowerCase(), phone = $('inputPhone').value.trim();
+            if (!email && !phone) { $('errContact').classList.add('show'); return; }
+            var lottery = $('inputLottery').value.replace(/\D/g, '').slice(0, 4);
+            if (lottery.length === 4 && !lotteryVerified) { await checkLottery(); if (!lotteryVerified) return; }
+            
+            $('regForm').style.display = 'none'; $('loadingReg').classList.add('show');
+            
+            try {
+                if (await checkDuplicate(name, email, phone)) { $('loadingReg').classList.remove('show'); $('regForm').style.display = 'block'; showModal(t.alertDuplicate, t.alertDuplicateMsg); return; }
+                if (lottery.length !== 4) { var { data: ex } = await supabase.from('registrations').select('lottery_number'); var used = (ex || []).map(function(r) { return r.lottery_number; }); do { lottery = String(Math.floor(1000 + Math.random() * 9000)); } while (used.indexOf(lottery) !== -1); }
+                
+                var id = 'FDL2026-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
+                var entryTime = selectedRole === 'staff' ? STAFF_TIME : VISITOR_TIME;
+                
+                var { error } = await supabase.from('registrations').insert([{
+                    id: id, name: name, role: selectedRole, email: email || null, phone: phone || null,
+                    lottery_number: lottery, entry_time: entryTime, entered: false
+                }]);
+                if (error) throw error;
+                
+                saveUserInfo();
+                $('loadingReg').classList.remove('show');
+                $('pendingSection').classList.add('show');
+                $('pendingRegId').textContent = id;
+                $('pendingLottery').textContent = lottery;
+                $('checkName').value = name; $('checkContact').value = email || phone;
+            } catch (e) { console.error(e); $('loadingReg').classList.remove('show'); $('regForm').style.display = 'block'; showModal(t.alertError, t.alertErrorMsg); }
+        }
+        
+        async function checkStatus() {
+            var t = T[lang], name = $('checkName').value.trim(), contact = $('checkContact').value.trim();
+            if (!name || !contact) return;
+            $('loadingCheck').classList.add('show'); $('statusResult').classList.remove('show'); $('resultSection').classList.remove('show');
+            
+            try {
+                var { data } = await supabase.from('registrations').select('*');
+                var found = null, nL = name.toLowerCase().trim(), cL = contact.toLowerCase().trim(), cD = contact.replace(/\D/g, '');
+                if (data) { for (var i = 0; i < data.length; i++) { var r = data[i], rN = r.name ? r.name.toLowerCase().trim() : '';
+                    if (rN.indexOf(nL) === -1 && nL.indexOf(rN) === -1) continue;
+                    if ((r.email && r.email.toLowerCase().trim() === cL) || (r.phone && cD && r.phone.replace(/\D/g, '').indexOf(cD) !== -1)) { found = r; break; }
+                }}
+                
+                $('loadingCheck').classList.remove('show');
+                
+                if (!found) { $('statusResult').classList.add('show'); $('statusResult').innerHTML = '<div class="status-not-found"><h3>' + t.statusNotFound + '</h3><p style="margin-top:10px;color:#ef9a9a;">' + t.statusNotFoundMsg + '</p></div>'; }
+                else if (found.verified !== true) { $('statusResult').classList.add('show'); $('statusResult').innerHTML = '<div class="status-pending"><h3>' + t.statusPending + '</h3><p style="margin-top:10px;">' + t.statusPendingMsg + '</p><div class="reg-id-box" style="margin-top:15px;"><div class="label">ID</div><div class="value">' + found.id + '</div></div><div class="reg-id-box"><div class="label">' + t.ticketLottery + '</div><div class="value" style="color:#ffd700;font-size:1.5em;">' + found.lottery_number + '</div></div></div>'; }
+                else { currentReg = { id: found.id, name: found.name, role: found.role, roleText: t[found.role], lottery: found.lottery_number, entryTime: found.entry_time, date: EVENT_DATE, location: 'Piazzale Michelangelo, Firenze', timestamp: found.created_at ? new Date(found.created_at).toLocaleString(lang === 'it' ? 'it-IT' : 'zh-CN') : '--' }; showTicket(); }
+            } catch (e) { console.error(e); $('loadingCheck').classList.remove('show'); showModal(T[lang].alertError, T[lang].alertErrorMsg); }
+        }
+        
+        function showTicket() {
+            var t = T[lang]; $('resultSection').classList.add('show'); $('regTimestamp').textContent = currentReg.timestamp;
+            var qr = $('qrcode'); qr.innerHTML = '';
+            try { new QRCode(qr, { text: JSON.stringify({ id: currentReg.id, name: currentReg.name, role: currentReg.role, lottery: currentReg.lottery, date: currentReg.date, time: currentReg.entryTime }), width: 200, height: 200, colorDark: '#1a0a0a', colorLight: '#fff', correctLevel: QRCode.CorrectLevel.H }); } catch (e) { qr.innerHTML = '<p style="color:#000;">ID: ' + currentReg.id + '</p>'; }
+            $('ticketDetails').innerHTML = '<div class="ticket-row"><span class="label">' + t.ticketId + '</span><span class="value">' + currentReg.id + '</span></div><div class="ticket-row"><span class="label">' + t.ticketName + '</span><span class="value">' + currentReg.name + '</span></div><div class="ticket-row"><span class="label">' + t.ticketRole + '</span><span class="value">' + currentReg.roleText + '</span></div><div class="ticket-row"><span class="label">' + t.ticketDate + '</span><span class="value">' + currentReg.date + '</span></div><div class="ticket-row"><span class="label">' + t.ticketTime + '</span><span class="value">' + currentReg.entryTime + '</span></div><div class="ticket-row"><span class="label">' + t.ticketRegTime + '</span><span class="value" style="font-size:0.85em;">' + currentReg.timestamp + '</span></div><div class="ticket-row highlight"><span class="label">' + t.ticketLottery + '</span><span class="value">' + currentReg.lottery + '</span></div>';
+        }
+        
+        function downloadPng() { var c = document.querySelector('#qrcode canvas'); if (!c) return; var t = T[lang], cv = document.createElement('canvas'), x = cv.getContext('2d'); cv.width = 420; cv.height = 620;
+            x.fillStyle = '#1a0a0a'; x.fillRect(0, 0, cv.width, cv.height); x.strokeStyle = '#c41e3a'; x.lineWidth = 5; x.strokeRect(12, 12, cv.width - 24, cv.height - 24);
+            x.fillStyle = '#ffd700'; x.font = 'bold 22px Arial'; x.textAlign = 'center'; x.fillText(t.pdfEvent, cv.width / 2, 48);
+            x.drawImage(c, (cv.width - 180) / 2, 70, 180, 180);
+            x.fillStyle = '#fff'; x.font = '14px Arial'; x.textAlign = 'left'; var y = 280, lh = 26;
+            x.fillText(t.ticketId + ': ' + currentReg.id, 35, y);
+            x.fillText(t.ticketName + ': ' + currentReg.name, 35, y + lh);
+            x.fillText(t.ticketRole + ': ' + currentReg.roleText, 35, y + lh * 2);
+            x.fillText(t.ticketDate + ': ' + currentReg.date, 35, y + lh * 3);
+            x.fillText(t.ticketTime + ': ' + currentReg.entryTime, 35, y + lh * 4);
+            x.fillStyle = '#87CEEB'; x.font = '12px Arial'; x.fillText(t.ticketRegTime + ': ' + currentReg.timestamp, 35, y + lh * 5.5);
+            x.fillStyle = '#ffd700'; x.font = 'bold 40px Arial'; x.textAlign = 'center'; x.fillText('🎯 ' + currentReg.lottery, cv.width / 2, y + lh * 8);
+            x.fillStyle = '#87CEEB'; x.font = '12px Arial'; x.fillText('📍 ' + currentReg.location, cv.width / 2, cv.height - 30);
+            var l = document.createElement('a'); l.download = 'Ticket_' + currentReg.id + '.png'; l.href = cv.toDataURL('image/png'); l.click();
+        }
+        
+        function downloadPdf() { var c = document.querySelector('#qrcode canvas'); if (!c) return; var t = T[lang], { jsPDF } = window.jspdf, pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' }), w = pdf.internal.pageSize.getWidth(), h = pdf.internal.pageSize.getHeight();
+            pdf.setFillColor(26, 10, 10); pdf.rect(0, 0, w, h, 'F'); pdf.setDrawColor(196, 30, 58); pdf.setLineWidth(1.5); pdf.rect(8, 8, w - 16, h - 16);
+            pdf.setTextColor(255, 215, 0); pdf.setFontSize(18); pdf.text(t.pdfTitle, w / 2, 22, { align: 'center' }); pdf.setFontSize(14); pdf.text(t.pdfEvent, w / 2, 32, { align: 'center' });
+            pdf.addImage(c.toDataURL('image/png'), 'PNG', (w - 50) / 2, 40, 50, 50);
+            pdf.setTextColor(255, 255, 255); pdf.setFontSize(10); var y = 100, lh = 8;
+            pdf.text(t.ticketId + ':', 15, y); pdf.text(currentReg.id, w - 15, y, { align: 'right' });
+            pdf.text(t.ticketName + ':', 15, y + lh); pdf.text(currentReg.name, w - 15, y + lh, { align: 'right' });
+            pdf.text(t.ticketRole + ':', 15, y + lh * 2); pdf.text(currentReg.roleText, w - 15, y + lh * 2, { align: 'right' });
+            pdf.text(t.ticketDate + ':', 15, y + lh * 3); pdf.text(currentReg.date, w - 15, y + lh * 3, { align: 'right' });
+            pdf.text(t.ticketTime + ':', 15, y + lh * 4); pdf.text(currentReg.entryTime, w - 15, y + lh * 4, { align: 'right' });
+            pdf.setTextColor(135, 206, 235); pdf.setFontSize(9); pdf.text(t.ticketRegTime + ':', 15, y + lh * 5.5); pdf.text(currentReg.timestamp, w - 15, y + lh * 5.5, { align: 'right' });
+            pdf.setTextColor(255, 215, 0); pdf.setFontSize(24); pdf.text(currentReg.lottery, w / 2, y + lh * 8, { align: 'center' });
+            pdf.setFontSize(12); pdf.text(t.ticketLottery, w / 2, y + lh * 9.5, { align: 'center' });
+            pdf.setTextColor(135, 206, 235); pdf.setFontSize(8); pdf.text(currentReg.location, w / 2, h - 15, { align: 'center' });
+            pdf.save('Ticket_' + currentReg.id + '.pdf');
+        }
+        
+        function newReg() { $('regForm').style.display = 'block'; $('pendingSection').classList.remove('show'); $('lotteryStatus').style.display = 'none'; $('inputLottery').value = ''; lotteryVerified = false; }
+        
+        $('btnLangIt').addEventListener('click', function() { selectLanguage('it'); });
+        $('btnLangZh').addEventListener('click', function() { selectLanguage('zh'); });
+        $('switchIt').addEventListener('click', function() { switchLanguage('it'); });
+        $('switchZh').addEventListener('click', function() { switchLanguage('zh'); });
+        $('roleVisitor').addEventListener('click', function() { selectRole('visitor'); });
+        $('roleStaff').addEventListener('click', function() { selectRole('staff'); });
+        $('tabRegister').addEventListener('click', function() { switchTab('register'); });
+        $('tabCheck').addEventListener('click', function() { switchTab('check'); });
+        $('btnCheckLottery').addEventListener('click', checkLottery);
+        $('btnRandomLottery').addEventListener('click', randomLottery);
+        $('btnSubmit').addEventListener('click', submitRegistration);
+        $('btnGoCheck').addEventListener('click', function() { switchTab('check'); });
+        $('btnNewReg').addEventListener('click', newReg);
+        $('btnCheckStatus').addEventListener('click', checkStatus);
+        $('btnDownloadPng').addEventListener('click', downloadPng);
+        $('btnDownloadPdf').addEventListener('click', downloadPdf);
+        $('modalBtn').addEventListener('click', hideModal);
+        $('modalOverlay').addEventListener('click', function(e) { if (e.target === $('modalOverlay')) hideModal(); });
+        $('inputLottery').addEventListener('input', function() { this.value = this.value.replace(/\D/g, '').slice(0, 4); lotteryVerified = false; });
+        $('rememberMe').addEventListener('change', function() { if (!this.checked) try { localStorage.removeItem('lanternUser2026'); } catch(e) {} });
+    })();
+    </script>
+</body>
+</html>

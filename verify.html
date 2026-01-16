@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifica Ingresso | 入场验证</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a1a2e 0%, #1a2a3e 50%, #0a1a2e 100%);
+            color: #fff;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        
+        .connection-status {
+            position: fixed; top: 10px; right: 10px; padding: 8px 15px;
+            border-radius: 20px; font-size: 0.85em; z-index: 100;
+        }
+        .connection-status.online { background: rgba(76, 175, 80, 0.3); border: 1px solid #4CAF50; color: #4CAF50; }
+        .connection-status.offline { background: rgba(244, 67, 54, 0.3); border: 1px solid #f44336; color: #f44336; }
+        
+        /* Language Selection */
+        .lang-screen { padding-top: 50px; text-align: center; }
+        .lang-screen h1 { font-size: 2em; color: #ffd700; margin-bottom: 30px; }
+        .lang-selector { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .lang-btn {
+            width: 250px; padding: 20px 40px; font-size: 20px; border: 2px solid #ffd700;
+            background: rgba(255, 215, 0, 0.1); color: #ffd700; border-radius: 10px;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+        .lang-btn:hover { background: #ffd700; color: #0a1a2e; }
+        
+        /* Header */
+        .header { text-align: center; padding: 15px 0; border-bottom: 2px solid #ffd700; margin-bottom: 25px; }
+        .header h1 { color: #ffd700; font-size: 1.6em; margin-bottom: 8px; }
+        .header .subtitle { color: #87CEEB; }
+        
+        /* Stats */
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 12px; margin-bottom: 25px;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 12px;
+            text-align: center; border: 1px solid rgba(255, 215, 0, 0.2);
+        }
+        .stat-card .number { font-size: 1.8em; font-weight: bold; color: #ffd700; }
+        .stat-card .label { color: #87CEEB; font-size: 0.85em; margin-top: 5px; }
+        .stat-card.highlight { border-color: #4CAF50; }
+        .stat-card.highlight .number { color: #4CAF50; }
+        
+        /* Tabs */
+        .tabs { display: flex; gap: 10px; margin-bottom: 25px; }
+        .tab-btn {
+            flex: 1; padding: 12px; font-size: 1em; border: 2px solid #ffd700;
+            background: rgba(255, 215, 0, 0.1); color: #ffd700; border-radius: 8px;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+        .tab-btn:hover, .tab-btn.active { background: #ffd700; color: #0a1a2e; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        /* Scanner */
+        .scanner-section {
+            background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px;
+        }
+        #reader { width: 100%; max-width: 350px; margin: 0 auto; border-radius: 10px; overflow: hidden; }
+        .scanner-hint { text-align: center; margin-top: 15px; color: #87CEEB; }
+        .scanner-controls { display: flex; gap: 10px; justify-content: center; margin-top: 20px; }
+        .scanner-btn {
+            padding: 12px 25px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 1em; font-weight: bold; transition: all 0.3s ease;
+        }
+        .scanner-btn.start { background: linear-gradient(135deg, #4CAF50, #2E7D32); color: #fff; }
+        .scanner-btn.stop { background: linear-gradient(135deg, #f44336, #b71c1c); color: #fff; }
+        .scanner-btn.switch { background: linear-gradient(135deg, #9C27B0, #7B1FA2); color: #fff; }
+        .scanner-btn:hover { transform: scale(1.05); }
+        
+        .camera-select-container { margin-top: 15px; text-align: center; }
+        .camera-select {
+            padding: 10px 20px; font-size: 1em; border: 2px solid #ffd700;
+            background: rgba(0, 0, 0, 0.3); color: #fff; border-radius: 8px;
+            cursor: pointer; min-width: 200px;
+        }
+        .camera-select:focus { outline: none; border-color: #fff; }
+        .camera-select option { background: #1a2a3e; color: #fff; }
+        .camera-info { color: #87CEEB; font-size: 0.9em; margin-top: 10px; }
+        
+        /* Manual Input */
+        .manual-section {
+            background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 25px;
+        }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: #ffd700; }
+        .form-group input {
+            width: 100%; padding: 15px; border: 2px solid rgba(255, 215, 0, 0.3);
+            border-radius: 10px; background: rgba(0, 0, 0, 0.3); color: #fff; font-size: 16px;
+        }
+        .form-group input:focus { outline: none; border-color: #ffd700; }
+        .verify-btn {
+            width: 100%; padding: 15px; background: linear-gradient(135deg, #4CAF50, #2E7D32);
+            border: none; border-radius: 10px; color: #fff; font-size: 1.1em;
+            font-weight: bold; cursor: pointer; transition: all 0.3s ease;
+        }
+        .verify-btn:hover { transform: scale(1.02); }
+        
+        /* Result Display */
+        .result-display {
+            margin-top: 25px; padding: 30px; border-radius: 15px; display: none;
+        }
+        .result-display.show { display: block; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        .result-display.valid { background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(46, 125, 50, 0.2)); border: 3px solid #4CAF50; }
+        .result-display.warning { background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 160, 0, 0.2)); border: 3px solid #FFC107; }
+        .result-display.invalid { background: linear-gradient(135deg, rgba(244, 67, 54, 0.2), rgba(183, 28, 28, 0.2)); border: 3px solid #f44336; }
+        
+        .result-header { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 20px; }
+        .result-header .icon { font-size: 3.5em; }
+        .result-header h2 { font-size: 1.6em; }
+        
+        .result-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+        .detail-item { background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; }
+        .detail-item .label { color: #87CEEB; font-size: 0.85em; margin-bottom: 5px; }
+        .detail-item .value { font-size: 1.05em; font-weight: bold; }
+        .detail-item.lottery { background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 140, 0, 0.2)); border: 2px solid #ffd700; }
+        .detail-item.lottery .value { color: #ffd700; font-size: 1.8em; }
+        
+        .action-buttons { display: flex; gap: 12px; margin-top: 25px; justify-content: center; flex-wrap: wrap; }
+        .action-btn {
+            padding: 15px 35px; border: none; border-radius: 10px; font-size: 1.1em;
+            font-weight: bold; cursor: pointer; transition: all 0.3s ease;
+        }
+        .action-btn.approve { background: linear-gradient(135deg, #4CAF50, #2E7D32); color: #fff; }
+        .action-btn.reject { background: linear-gradient(135deg, #f44336, #b71c1c); color: #fff; }
+        .action-btn.reset { background: linear-gradient(135deg, #2196F3, #1565C0); color: #fff; }
+        .action-btn:hover { transform: scale(1.05); }
+        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        
+        /* Entry Log */
+        .log-section { margin-top: 25px; }
+        .log-section h3 { color: #ffd700; margin-bottom: 15px; }
+        .log-table {
+            width: 100%; border-collapse: collapse; background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px; overflow: hidden;
+        }
+        .log-table th, .log-table td {
+            padding: 12px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .log-table th { background: rgba(255, 215, 0, 0.2); color: #ffd700; }
+        .log-table tr:hover { background: rgba(255, 255, 255, 0.05); }
+        .status-badge { padding: 4px 12px; border-radius: 15px; font-size: 0.85em; font-weight: bold; }
+        .status-badge.entered { background: rgba(76, 175, 80, 0.3); color: #4CAF50; }
+        
+        /* Audio Indicator */
+        .audio-indicator {
+            position: fixed; bottom: 20px; right: 20px; padding: 15px 25px;
+            border-radius: 10px; font-weight: bold; display: none; z-index: 1000; font-size: 1.1em;
+        }
+        .audio-indicator.success { display: block; background: #4CAF50; color: #fff; animation: pulse 0.5s ease; }
+        .audio-indicator.error { display: block; background: #f44336; color: #fff; animation: pulse 0.5s ease; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        
+        .hidden { display: none !important; }
+        
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .tabs { flex-direction: column; }
+            .result-details { grid-template-columns: 1fr; }
+            .action-buttons { flex-direction: column; }
+            .action-btn { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status offline" id="connStatus">●</div>
+    <div class="audio-indicator" id="audioIndicator"></div>
+    
+    <div class="container">
+        <!-- LANGUAGE SELECTION -->
+        <div class="lang-screen" id="langScreen">
+            <h1>🏮 Verifica Ingresso | 入场验证</h1>
+            <div class="lang-selector">
+                <button class="lang-btn" id="btnLangIt">🇮🇹 Italiano</button>
+                <button class="lang-btn" id="btnLangZh">🇨🇳 中文</button>
+            </div>
+        </div>
+        
+        <!-- MAIN SCREEN -->
+        <div id="mainScreen" class="hidden">
+            <div class="header">
+                <h1 id="headerTitle">🏮 Verifica Ingresso</h1>
+                <p class="subtitle">Piazzale Michelangelo | 03/02/2026</p>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="number" id="statTotal">0</div>
+                    <div class="label" id="lblTotal">Registrati</div>
+                </div>
+                <div class="stat-card highlight">
+                    <div class="number" id="statEntered">0</div>
+                    <div class="label" id="lblEntered">Entrati</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="statStaff">0</div>
+                    <div class="label" id="lblStaff">Staff</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number" id="statVisitors">0</div>
+                    <div class="label" id="lblVisitors">Visitatori</div>
+                </div>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab-btn active" id="tabScanner">📷</button>
+                <button class="tab-btn" id="tabManual">⌨️</button>
+                <button class="tab-btn" id="tabLog">📋</button>
+            </div>
+            
+            <!-- SCANNER TAB -->
+            <div class="tab-content active" id="scannerTab">
+                <div class="scanner-section">
+                    <div id="reader"></div>
+                    <p class="scanner-hint" id="scannerHint">Posiziona il codice QR davanti alla fotocamera</p>
+                    <div class="scanner-controls">
+                        <button class="scanner-btn start" id="btnStart">▶️</button>
+                        <button class="scanner-btn stop" id="btnStop" style="display:none;">⏹️</button>
+                        <button class="scanner-btn switch" id="btnSwitch" style="display:none;">🔄📷</button>
+                    </div>
+                    <div class="camera-select-container">
+                        <select class="camera-select" id="cameraSelect">
+                            <option value="" id="optSelectCamera">-- Seleziona Fotocamera --</option>
+                        </select>
+                        <p class="camera-info" id="cameraInfo"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- MANUAL TAB -->
+            <div class="tab-content" id="manualTab">
+                <div class="manual-section">
+                    <div class="form-group">
+                        <label id="lblRegId">ID Registrazione</label>
+                        <input type="text" id="inputRegId" placeholder="FDL2026-XXXXX">
+                    </div>
+                    <div class="form-group">
+                        <label id="lblLottery">Numero Lotteria</label>
+                        <input type="text" id="inputLottery" placeholder="8888" maxlength="4">
+                    </div>
+                    <button class="verify-btn" id="btnVerify">🔍</button>
+                </div>
+            </div>
+            
+            <!-- LOG TAB -->
+            <div class="tab-content" id="logTab">
+                <div class="log-section">
+                    <h3 id="logTitle">Ingressi Recenti</h3>
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th id="thTime">Ora</th>
+                                <th id="thName">Nome</th>
+                                <th id="thRole">Ruolo</th>
+                                <th id="thLottery">Lotteria</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logBody">
+                            <tr><td colspan="4" style="text-align:center;color:#87CEEB;" id="noEntries">Nessun ingresso</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- RESULT DISPLAY -->
+            <div class="result-display" id="resultDisplay">
+                <div class="result-header">
+                    <span class="icon" id="resultIcon">✅</span>
+                    <h2 id="resultTitle">Verifica Completata</h2>
+                </div>
+                <div class="result-details" id="resultDetails"></div>
+                <div class="action-buttons">
+                    <button class="action-btn approve" id="btnApprove">✅</button>
+                    <button class="action-btn reject" id="btnReject">❌</button>
+                    <button class="action-btn reset" id="btnReset">🔄</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        // =============================================
+        // SUPABASE CONFIG
+        // =============================================
+        var SUPABASE_URL = 'https://mfwgfgjneeymavxgbwde.supabase.co';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1md2dmZ2puZWV5bWF2eGdid2RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTMzNzgsImV4cCI6MjA4Mzk4OTM3OH0.11Ww-TwArHnrM6Lw7q_ZbJu5tFLugsAq9jT6H6p42WE';
+        
+        var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        // =============================================
+        // STATE
+        // =============================================
+        var lang = 'it';
+        var html5QrCode = null;
+        var isScanning = false;
+        var currentReg = null;
+        var cameras = [];
+        var currentCameraIndex = 0;
+        
+        // =============================================
+        // TRANSLATIONS
+        // =============================================
+        var T = {
+            it: {
+                headerTitle: '🏮 Verifica Ingresso',
+                lblTotal: 'Registrati',
+                lblEntered: 'Entrati',
+                lblStaff: 'Staff',
+                lblVisitors: 'Visitatori',
+                tabScanner: '📷 Scanner',
+                tabManual: '⌨️ Manuale',
+                tabLog: '📋 Registro',
+                scannerHint: 'Posiziona il codice QR davanti alla fotocamera',
+                btnStart: '▶️ Avvia',
+                btnStop: '⏹️ Ferma',
+                lblRegId: 'ID Registrazione',
+                lblLottery: 'Numero Lotteria',
+                btnVerify: '🔍 VERIFICA',
+                logTitle: 'Ingressi Recenti',
+                thTime: 'Ora',
+                thName: 'Nome',
+                thRole: 'Ruolo',
+                thLottery: 'Lotteria',
+                noEntries: 'Nessun ingresso registrato',
+                btnApprove: '✅ CONFERMA INGRESSO',
+                btnReject: '❌ RIFIUTA',
+                btnReset: '🔄 NUOVA SCANSIONE',
+                valid: '✅ VALIDO',
+                warning: '⚠️ GIÀ ENTRATO',
+                invalid: '❌ NON TROVATO',
+                enteredAt: 'Entrato alle',
+                visitor: 'Visitatore',
+                staff: 'Staff',
+                online: '🟢 Connesso',
+                offline: '🔴 Disconnesso',
+                confirmed: '✅ INGRESSO CONFERMATO',
+                rejected: '❌ INGRESSO RIFIUTATO',
+                lblId: 'ID',
+                lblName: 'Nome',
+                lblRole: 'Ruolo',
+                lblTime: 'Orario',
+                lblLotteryNum: 'Lotteria',
+                lblContact: 'Contatto',
+                selectCamera: '-- Seleziona Fotocamera --',
+                cameraInfo: 'Fotocamera {index} di {total}',
+                switchCamera: '🔄 Cambia',
+                noCameras: 'Nessuna fotocamera trovata'
+            },
+            zh: {
+                headerTitle: '🏮 入场验证',
+                lblTotal: '已注册',
+                lblEntered: '已入场',
+                lblStaff: '工作人员',
+                lblVisitors: '访客',
+                tabScanner: '📷 扫描',
+                tabManual: '⌨️ 手动',
+                tabLog: '📋 记录',
+                scannerHint: '将二维码对准摄像头',
+                btnStart: '▶️ 开始',
+                btnStop: '⏹️ 停止',
+                lblRegId: '注册ID',
+                lblLottery: '抽奖号码',
+                btnVerify: '🔍 验证',
+                logTitle: '最近入场记录',
+                thTime: '时间',
+                thName: '姓名',
+                thRole: '角色',
+                thLottery: '抽奖',
+                noEntries: '暂无入场记录',
+                btnApprove: '✅ 确认入场',
+                btnReject: '❌ 拒绝',
+                btnReset: '🔄 新扫描',
+                valid: '✅ 有效',
+                warning: '⚠️ 已入场',
+                invalid: '❌ 未找到',
+                enteredAt: '入场时间',
+                visitor: '访客',
+                staff: '工作人员',
+                online: '🟢 已连接',
+                offline: '🔴 未连接',
+                confirmed: '✅ 入场已确认',
+                rejected: '❌ 入场已拒绝',
+                lblId: 'ID',
+                lblName: '姓名',
+                lblRole: '角色',
+                lblTime: '时间',
+                lblLotteryNum: '抽奖号码',
+                lblContact: '联系方式',
+                selectCamera: '-- 选择摄像头 --',
+                cameraInfo: '摄像头 {index} / {total}',
+                switchCamera: '🔄 切换',
+                noCameras: '未找到摄像头'
+            }
+        };
+        
+        // =============================================
+        // DOM
+        // =============================================
+        var $ = function(id) { return document.getElementById(id); };
+        
+        // =============================================
+        // FUNCTIONS
+        // =============================================
+        function updateUI() {
+            var t = T[lang];
+            $('headerTitle').textContent = t.headerTitle;
+            $('lblTotal').textContent = t.lblTotal;
+            $('lblEntered').textContent = t.lblEntered;
+            $('lblStaff').textContent = t.lblStaff;
+            $('lblVisitors').textContent = t.lblVisitors;
+            $('tabScanner').textContent = t.tabScanner;
+            $('tabManual').textContent = t.tabManual;
+            $('tabLog').textContent = t.tabLog;
+            $('scannerHint').textContent = t.scannerHint;
+            $('btnStart').textContent = t.btnStart;
+            $('btnStop').textContent = t.btnStop;
+            $('lblRegId').textContent = t.lblRegId;
+            $('lblLottery').textContent = t.lblLottery;
+            $('btnVerify').textContent = t.btnVerify;
+            $('logTitle').textContent = t.logTitle;
+            $('thTime').textContent = t.thTime;
+            $('thName').textContent = t.thName;
+            $('thRole').textContent = t.thRole;
+            $('thLottery').textContent = t.thLottery;
+            $('noEntries').textContent = t.noEntries;
+            $('btnApprove').textContent = t.btnApprove;
+            $('btnReject').textContent = t.btnReject;
+            $('btnReset').textContent = t.btnReset;
+        }
+        
+        async function updateStats() {
+            try {
+                var { data, error } = await supabase.from('registrations').select('role, entered');
+                if (error) throw error;
+                
+                var total = data ? data.length : 0;
+                var entered = data ? data.filter(function(r) { return r.entered; }).length : 0;
+                var staff = data ? data.filter(function(r) { return r.role === 'staff' && r.entered; }).length : 0;
+                var visitors = data ? data.filter(function(r) { return r.role === 'visitor' && r.entered; }).length : 0;
+                
+                $('statTotal').textContent = total;
+                $('statEntered').textContent = entered;
+                $('statStaff').textContent = staff;
+                $('statVisitors').textContent = visitors;
+                
+                setConnected(true);
+            } catch (e) {
+                setConnected(false);
+            }
+        }
+        
+        async function updateLog() {
+            try {
+                var { data, error } = await supabase
+                    .from('registrations')
+                    .select('*')
+                    .eq('entered', true)
+                    .order('entered_at', { ascending: false })
+                    .limit(15);
+                
+                var tbody = $('logBody');
+                var t = T[lang];
+                
+                if (!data || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#87CEEB;">' + t.noEntries + '</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = data.map(function(r) {
+                    var time = r.entered_at ? new Date(r.entered_at).toLocaleTimeString(lang === 'it' ? 'it-IT' : 'zh-CN', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+                    return '<tr>' +
+                        '<td>' + time + '</td>' +
+                        '<td>' + r.name + '</td>' +
+                        '<td>' + t[r.role] + '</td>' +
+                        '<td style="color:#ffd700;font-weight:bold;">' + r.lottery_number + '</td>' +
+                        '</tr>';
+                }).join('');
+            } catch (e) {
+                console.error('Log error:', e);
+            }
+        }
+        
+        function setConnected(online) {
+            var t = T[lang];
+            var el = $('connStatus');
+            if (online) {
+                el.className = 'connection-status online';
+                el.textContent = t.online;
+            } else {
+                el.className = 'connection-status offline';
+                el.textContent = t.offline;
+            }
+        }
+        
+        function selectLanguage(l) {
+            lang = l;
+            $('langScreen').classList.add('hidden');
+            $('mainScreen').classList.remove('hidden');
+            updateUI();
+            updateStats();
+            updateLog();
+            
+            supabase
+                .channel('verify')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, function() {
+                    updateStats();
+                    updateLog();
+                })
+                .subscribe();
+        }
+        
+        function switchTab(tab) {
+            $('tabScanner').classList.toggle('active', tab === 'scanner');
+            $('tabManual').classList.toggle('active', tab === 'manual');
+            $('tabLog').classList.toggle('active', tab === 'log');
+            $('scannerTab').classList.toggle('active', tab === 'scanner');
+            $('manualTab').classList.toggle('active', tab === 'manual');
+            $('logTab').classList.toggle('active', tab === 'log');
+            
+            if (tab === 'log') updateLog();
+        }
+        
+        function startScanner() {
+            if (isScanning) return;
+            
+            html5QrCode = new Html5Qrcode("reader");
+            
+            Html5Qrcode.getCameras().then(function(devices) {
+                if (devices && devices.length) {
+                    cameras = devices;
+                    updateCameraSelect();
+                    
+                    // Try to find back camera first
+                    var backCamIndex = devices.findIndex(function(d) { 
+                        return d.label.toLowerCase().indexOf('back') !== -1 || 
+                               d.label.toLowerCase().indexOf('rear') !== -1 ||
+                               d.label.toLowerCase().indexOf('后') !== -1;
+                    });
+                    currentCameraIndex = backCamIndex !== -1 ? backCamIndex : 0;
+                    $('cameraSelect').value = cameras[currentCameraIndex].id;
+                    
+                    startCameraById(cameras[currentCameraIndex].id);
+                } else {
+                    alert(T[lang].noCameras);
+                }
+            }).catch(function(err) {
+                alert(lang === 'it' ? 'Errore fotocamera: ' + err : '摄像头错误：' + err);
+            });
+        }
+        
+        function startCameraById(cameraId) {
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("reader");
+            }
+            
+            html5QrCode.start(cameraId, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, function() {})
+            .then(function() {
+                isScanning = true;
+                $('btnStart').style.display = 'none';
+                $('btnStop').style.display = 'inline-block';
+                if (cameras.length > 1) {
+                    $('btnSwitch').style.display = 'inline-block';
+                }
+                updateCameraInfo();
+            }).catch(function(err) {
+                console.error('Camera start error:', err);
+            });
+        }
+        
+        function updateCameraSelect() {
+            var select = $('cameraSelect');
+            var t = T[lang];
+            select.innerHTML = '<option value="">' + t.selectCamera + '</option>';
+            
+            cameras.forEach(function(cam, idx) {
+                var option = document.createElement('option');
+                option.value = cam.id;
+                option.textContent = cam.label || ((lang === 'it' ? 'Fotocamera ' : '摄像头 ') + (idx + 1));
+                select.appendChild(option);
+            });
+        }
+        
+        function updateCameraInfo() {
+            var t = T[lang];
+            var info = t.cameraInfo.replace('{index}', currentCameraIndex + 1).replace('{total}', cameras.length);
+            $('cameraInfo').textContent = info;
+        }
+        
+        function switchCamera() {
+            if (cameras.length <= 1 || !isScanning) return;
+            
+            currentCameraIndex = (currentCameraIndex + 1) % cameras.length;
+            $('cameraSelect').value = cameras[currentCameraIndex].id;
+            
+            html5QrCode.stop().then(function() {
+                startCameraById(cameras[currentCameraIndex].id);
+            });
+        }
+        
+        function onCameraSelectChange() {
+            var selectedId = $('cameraSelect').value;
+            if (!selectedId || !isScanning) return;
+            
+            var idx = cameras.findIndex(function(c) { return c.id === selectedId; });
+            if (idx !== -1) {
+                currentCameraIndex = idx;
+                html5QrCode.stop().then(function() {
+                    startCameraById(selectedId);
+                });
+            }
+        }
+        
+        function stopScanner() {
+            if (html5QrCode && isScanning) {
+                html5QrCode.stop().then(function() {
+                    isScanning = false;
+                    $('btnStart').style.display = 'inline-block';
+                    $('btnStop').style.display = 'none';
+                    $('btnSwitch').style.display = 'none';
+                    $('cameraInfo').textContent = '';
+                });
+            }
+        }
+        
+        function onScanSuccess(text) {
+            if (html5QrCode && isScanning) html5QrCode.pause();
+            
+            try {
+                var data = JSON.parse(text);
+                verifyRegistration(data.id, null);
+            } catch (e) {
+                showInvalid();
+                playSound('error');
+            }
+        }
+        
+        async function verifyRegistration(regId, lottery) {
+            try {
+                var query = supabase.from('registrations').select('*');
+                
+                if (regId) {
+                    query = query.eq('id', regId);
+                } else if (lottery) {
+                    query = query.eq('lottery_number', lottery);
+                }
+                
+                var { data, error } = await query.single();
+                
+                if (error || !data) {
+                    showInvalid();
+                    playSound('error');
+                    return;
+                }
+                
+                currentReg = data;
+                
+                if (data.entered) {
+                    showWarning(data);
+                    playSound('warning');
+                } else {
+                    showValid(data);
+                    playSound('success');
+                }
+            } catch (e) {
+                showInvalid();
+                playSound('error');
+            }
+        }
+        
+        function verifyManual() {
+            var regId = $('inputRegId').value.trim();
+            var lottery = $('inputLottery').value.trim();
+            
+            if (!regId && !lottery) {
+                alert(lang === 'it' ? 'Inserisci ID o numero lotteria' : '请输入ID或抽奖号码');
+                return;
+            }
+            
+            verifyRegistration(regId || null, lottery || null);
+        }
+        
+        function showValid(data) {
+            var t = T[lang];
+            var result = $('resultDisplay');
+            result.className = 'result-display show valid';
+            $('resultIcon').textContent = '✅';
+            $('resultTitle').textContent = t.valid;
+            $('btnApprove').disabled = false;
+            
+            $('resultDetails').innerHTML = 
+                '<div class="detail-item"><div class="label">' + t.lblId + '</div><div class="value">' + data.id + '</div></div>' +
+                '<div class="detail-item"><div class="label">' + t.lblName + '</div><div class="value">' + data.name + '</div></div>' +
+                '<div class="detail-item"><div class="label">' + t.lblRole + '</div><div class="value">' + t[data.role] + '</div></div>' +
+                '<div class="detail-item"><div class="label">' + t.lblTime + '</div><div class="value">' + data.entry_time + '</div></div>' +
+                '<div class="detail-item lottery"><div class="label">' + t.lblLotteryNum + '</div><div class="value">' + data.lottery_number + '</div></div>' +
+                '<div class="detail-item"><div class="label">' + t.lblContact + '</div><div class="value">' + (data.email || data.phone || '-') + '</div></div>';
+        }
+        
+        function showWarning(data) {
+            var t = T[lang];
+            var result = $('resultDisplay');
+            result.className = 'result-display show warning';
+            $('resultIcon').textContent = '⚠️';
+            $('resultTitle').textContent = t.warning;
+            $('btnApprove').disabled = true;
+            
+            var enteredTime = data.entered_at ? new Date(data.entered_at).toLocaleString(lang === 'it' ? 'it-IT' : 'zh-CN') : '-';
+            
+            $('resultDetails').innerHTML = 
+                '<div class="detail-item"><div class="label">' + t.lblId + '</div><div class="value">' + data.id + '</div></div>' +
+                '<div class="detail-item"><div class="label">' + t.lblName + '</div><div class="value">' + data.name + '</div></div>' +
+                '<div class="detail-item"><div class="label">' + t.lblRole + '</div><div class="value">' + t[data.role] + '</div></div>' +
+                '<div class="detail-item" style="border:2px solid #FFC107;"><div class="label">' + t.enteredAt + '</div><div class="value" style="color:#FFC107;">' + enteredTime + '</div></div>' +
+                '<div class="detail-item lottery"><div class="label">' + t.lblLotteryNum + '</div><div class="value">' + data.lottery_number + '</div></div>';
+        }
+        
+        function showInvalid() {
+            var t = T[lang];
+            var result = $('resultDisplay');
+            result.className = 'result-display show invalid';
+            $('resultIcon').textContent = '❌';
+            $('resultTitle').textContent = t.invalid;
+            $('btnApprove').disabled = true;
+            $('resultDetails').innerHTML = '';
+        }
+        
+        async function confirmEntry() {
+            if (!currentReg) return;
+            $('btnApprove').disabled = true;
+            
+            try {
+                var { error } = await supabase
+                    .from('registrations')
+                    .update({ entered: true, entered_at: new Date().toISOString() })
+                    .eq('id', currentReg.id);
+                
+                if (error) throw error;
+                
+                showIndicator('success', T[lang].confirmed);
+                playSound('confirm');
+                updateStats();
+                
+                setTimeout(resetScanner, 1500);
+            } catch (e) {
+                $('btnApprove').disabled = false;
+                alert(lang === 'it' ? 'Errore' : '错误');
+            }
+        }
+        
+        function rejectEntry() {
+            showIndicator('error', T[lang].rejected);
+            playSound('error');
+            setTimeout(resetScanner, 1000);
+        }
+        
+        function resetScanner() {
+            currentReg = null;
+            $('resultDisplay').className = 'result-display';
+            $('inputRegId').value = '';
+            $('inputLottery').value = '';
+            
+            if (html5QrCode && isScanning) {
+                try { html5QrCode.resume(); } catch(e) {}
+            }
+        }
+        
+        function playSound(type) {
+            try {
+                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                gain.gain.value = 0.3;
+                
+                if (type === 'success' || type === 'confirm') {
+                    osc.frequency.value = 880;
+                    osc.start();
+                    setTimeout(function() { osc.frequency.value = 1100; }, 100);
+                    setTimeout(function() { osc.stop(); }, 200);
+                } else if (type === 'warning') {
+                    osc.frequency.value = 440;
+                    osc.start();
+                    setTimeout(function() { osc.stop(); }, 300);
+                } else {
+                    osc.frequency.value = 200;
+                    osc.start();
+                    setTimeout(function() { osc.stop(); }, 400);
+                }
+                
+                if (navigator.vibrate) {
+                    navigator.vibrate(type === 'success' || type === 'confirm' ? 200 : [100, 50, 100]);
+                }
+            } catch(e) {}
+        }
+        
+        function showIndicator(type, text) {
+            var el = $('audioIndicator');
+            el.className = 'audio-indicator ' + type;
+            el.textContent = text;
+            setTimeout(function() { el.className = 'audio-indicator'; }, 2000);
+        }
+        
+        // =============================================
+        // EVENT LISTENERS
+        // =============================================
+        $('btnLangIt').addEventListener('click', function() { selectLanguage('it'); });
+        $('btnLangZh').addEventListener('click', function() { selectLanguage('zh'); });
+        $('tabScanner').addEventListener('click', function() { switchTab('scanner'); });
+        $('tabManual').addEventListener('click', function() { switchTab('manual'); });
+        $('tabLog').addEventListener('click', function() { switchTab('log'); });
+        $('btnStart').addEventListener('click', startScanner);
+        $('btnStop').addEventListener('click', stopScanner);
+        $('btnSwitch').addEventListener('click', switchCamera);
+        $('cameraSelect').addEventListener('change', onCameraSelectChange);
+        $('btnVerify').addEventListener('click', verifyManual);
+        $('btnApprove').addEventListener('click', confirmEntry);
+        $('btnReject').addEventListener('click', rejectEntry);
+        $('btnReset').addEventListener('click', resetScanner);
+        
+        $('inputLottery').addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '').slice(0, 4);
+        });
+        
+    })();
+    </script>
+</body>
+</html>

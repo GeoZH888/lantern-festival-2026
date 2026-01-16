@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIP Registration | VIP注册</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0d0d0d 0%, #1a1a2e 50%, #0d0d0d 100%);
+            color: #fff;
+        }
+        .container { max-width: 550px; margin: 0 auto; padding: 20px; }
+        
+        .lang-switch { position: fixed; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 100; }
+        .lang-switch button { padding: 8px 12px; border: 2px solid #d4af37; background: rgba(212, 175, 55, 0.2); color: #d4af37; border-radius: 8px; cursor: pointer; }
+        .lang-switch button.active { background: #d4af37; color: #0d0d0d; }
+        
+        .lang-screen { padding-top: 80px; text-align: center; }
+        .lang-screen h1 { font-size: 2.2em; color: #d4af37; margin-bottom: 10px; }
+        .lang-screen h2 { font-size: 1.6em; color: #d4af37; margin-bottom: 50px; }
+        .vip-badge { font-size: 3em; margin-bottom: 20px; }
+        .lang-selector { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .lang-btn { width: 260px; padding: 22px; font-size: 20px; border: 3px solid #d4af37; background: rgba(212, 175, 55, 0.1); color: #d4af37; border-radius: 15px; cursor: pointer; }
+        .lang-btn:hover { background: linear-gradient(135deg, #d4af37, #b8960c); color: #0d0d0d; }
+        
+        .header { text-align: center; margin-bottom: 30px; }
+        .header .vip { font-size: 2.5em; color: #d4af37; margin-bottom: 10px; }
+        .header h1 { font-size: 1.8em; color: #d4af37; text-shadow: 0 0 20px rgba(212, 175, 55, 0.5); margin-bottom: 15px; }
+        .event-info { background: rgba(212, 175, 55, 0.1); padding: 15px; border-radius: 10px; border: 1px solid rgba(212, 175, 55, 0.3); }
+        .event-info p { margin: 5px 0; }
+        
+        .form-container { background: rgba(26, 26, 46, 0.9); border-radius: 20px; padding: 30px; border: 2px solid #d4af37; }
+        .form-group { margin-bottom: 22px; }
+        .form-group label { display: block; margin-bottom: 10px; color: #d4af37; font-size: 1.1em; }
+        .form-group label .required { color: #ff6b6b; }
+        .form-group input { width: 100%; padding: 16px; font-size: 16px; border: 2px solid #d4af37; border-radius: 10px; background: rgba(0, 0, 0, 0.4); color: #fff; }
+        .form-group input:focus { outline: none; border-color: #fff; box-shadow: 0 0 15px rgba(212, 175, 55, 0.3); }
+        
+        .lottery-section { background: rgba(212, 175, 55, 0.1); border-radius: 15px; padding: 20px; margin-bottom: 22px; border: 2px solid rgba(212, 175, 55, 0.5); }
+        .lottery-section h3 { color: #d4af37; margin-bottom: 8px; text-align: center; font-size: 1.2em; }
+        .lottery-hint { color: #87CEEB; font-size: 0.95em; text-align: center; margin-bottom: 15px; line-height: 1.5; }
+        .lottery-input-group { display: flex; gap: 10px; }
+        .lottery-input-group input { flex: 1; text-align: center; font-size: 28px; letter-spacing: 12px; font-weight: bold; }
+        .lottery-btn { padding: 14px 20px; background: linear-gradient(135deg, #d4af37, #b8960c); border: none; color: #0d0d0d; border-radius: 10px; cursor: pointer; font-size: 1.2em; font-weight: bold; }
+        .lottery-btn:hover { transform: scale(1.05); }
+        .lottery-status { text-align: center; padding: 12px; border-radius: 8px; margin-top: 12px; font-weight: bold; }
+        .lottery-status.available { background: rgba(46, 125, 50, 0.3); border: 1px solid #4caf50; color: #4caf50; }
+        .lottery-status.taken { background: rgba(244, 67, 54, 0.3); border: 1px solid #f44336; color: #f44336; }
+        .lottery-status.checking { background: rgba(33, 150, 243, 0.3); border: 1px solid #2196F3; color: #2196F3; }
+        
+        .submit-btn { width: 100%; padding: 18px; font-size: 1.2em; background: linear-gradient(135deg, #d4af37, #b8960c); border: none; border-radius: 12px; color: #0d0d0d; font-weight: bold; cursor: pointer; }
+        .submit-btn:hover { transform: scale(1.02); box-shadow: 0 0 30px rgba(212, 175, 55, 0.5); }
+        
+        .pending-section, .result-section { display: none; text-align: center; }
+        .pending-section.show, .result-section.show { display: block; }
+        
+        .pending-box { background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 152, 0, 0.2)); border: 3px solid #FFC107; border-radius: 15px; padding: 30px; margin-bottom: 20px; }
+        .pending-box .icon { font-size: 4em; margin-bottom: 15px; }
+        .pending-box h2 { color: #FFC107; margin-bottom: 10px; }
+        
+        .success-box { background: linear-gradient(135deg, rgba(46, 125, 50, 0.3), rgba(27, 94, 32, 0.3)); border: 3px solid #4caf50; border-radius: 15px; padding: 25px; margin-bottom: 20px; }
+        .success-box h2 { color: #4caf50; margin-bottom: 8px; }
+        
+        .info-box { background: rgba(212, 175, 55, 0.1); border: 2px solid #d4af37; border-radius: 10px; padding: 15px; margin: 15px 0; }
+        .info-box .label { color: #87CEEB; font-size: 0.9em; margin-bottom: 5px; }
+        .info-box .value { color: #d4af37; font-size: 1.3em; font-weight: bold; font-family: monospace; }
+        
+        .qr-container { background: #fff; padding: 20px; border-radius: 15px; display: inline-block; margin: 20px 0; }
+        
+        .action-btn { padding: 14px 25px; border-radius: 10px; font-weight: bold; cursor: pointer; border: none; font-size: 1em; margin: 5px; }
+        .action-btn.check { background: linear-gradient(135deg, #9C27B0, #7B1FA2); color: #fff; }
+        .action-btn.new { background: linear-gradient(135deg, #607D8B, #455A64); color: #fff; }
+        .action-btn.download { background: linear-gradient(135deg, #4caf50, #2e7d32); color: #fff; }
+        
+        .loading { display: none; text-align: center; padding: 40px; }
+        .loading.show { display: block; }
+        .spinner { width: 50px; height: 50px; border: 4px solid rgba(212, 175, 55, 0.3); border-top-color: #d4af37; border-radius: 50%; margin: 0 auto 15px; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 999; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: linear-gradient(135deg, #1a1a2e, #0d0d0d); border: 3px solid #d4af37; border-radius: 15px; padding: 25px; max-width: 380px; width: 90%; text-align: center; }
+        .modal-box h3 { color: #d4af37; margin-bottom: 15px; }
+        .modal-box p { margin-bottom: 20px; }
+        .modal-box button { padding: 12px 35px; background: linear-gradient(135deg, #d4af37, #b8960c); border: none; color: #0d0d0d; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        .hidden { display: none !important; }
+        @media (max-width: 480px) { .lottery-input-group { flex-direction: column; } }
+    </style>
+</head>
+<body>
+    <div class="lang-switch">
+        <button id="switchIt">🇮🇹 IT</button>
+        <button id="switchZh">🇨🇳 中文</button>
+    </div>
+    
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-box">
+            <h3 id="modalTitle">⚠️</h3>
+            <p id="modalMsg"></p>
+            <button id="modalBtn">OK</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="lang-screen" id="langScreen">
+            <div class="vip-badge">👑</div>
+            <h1>Festa delle Lanterne 2026</h1>
+            <h2>VIP Registration | VIP注册</h2>
+            <div class="lang-selector">
+                <button class="lang-btn" id="btnLangIt">🇮🇹 Italiano</button>
+                <button class="lang-btn" id="btnLangZh">🇨🇳 中文</button>
+            </div>
+        </div>
+        
+        <div id="mainScreen" class="hidden">
+            <div class="header">
+                <div class="vip">👑 VIP</div>
+                <h1 id="headerTitle">Festa delle Lanterne 2026</h1>
+                <div class="event-info">
+                    <p>📅 <strong>01/03/2026</strong></p>
+                    <p>📍 <strong>Piazzale Michelangelo, Firenze</strong></p>
+                </div>
+            </div>
+            
+            <div class="form-container" id="regForm">
+                <div class="form-group">
+                    <label id="lblName">Nome Completo <span class="required">*</span></label>
+                    <input type="text" id="inputName" placeholder="">
+                </div>
+                
+                <div class="form-group">
+                    <label id="lblOrg">Organizzazione <span class="required">*</span></label>
+                    <input type="text" id="inputOrg" placeholder="">
+                </div>
+                
+                <div class="lottery-section">
+                    <h3 id="lblLottery">🎯 Numero Personale</h3>
+                    <p class="lottery-hint" id="hintLottery">Scegli 4 cifre personalmente oppure seleziona l'assegnazione casuale</p>
+                    <div class="lottery-input-group">
+                        <input type="text" id="inputLottery" maxlength="4" placeholder="8888">
+                        <button type="button" class="lottery-btn" id="btnCheckLottery">✓</button>
+                        <button type="button" class="lottery-btn" id="btnRandomLottery">🎲</button>
+                    </div>
+                    <div class="lottery-status" id="lotteryStatus" style="display:none;"></div>
+                </div>
+                
+                <button class="submit-btn" id="btnSubmit">👑 REGISTRA VIP</button>
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p id="loadingText">Elaborazione...</p>
+            </div>
+            
+            <div class="pending-section" id="pendingSection">
+                <div class="pending-box">
+                    <div class="icon">⏳</div>
+                    <h2 id="pendingTitle">In Attesa di Approvazione</h2>
+                    <p id="pendingMsg">La tua registrazione VIP è stata inviata. Attendi l'approvazione.</p>
+                </div>
+                <div class="info-box">
+                    <div class="label">ID</div>
+                    <div class="value" id="pendingId">--</div>
+                </div>
+                <div class="info-box">
+                    <div class="label" id="lblNum">Numero Personale</div>
+                    <div class="value" id="pendingNum" style="font-size:1.8em;">--</div>
+                </div>
+                <button class="action-btn check" id="btnGoCheck">🔍</button>
+                <button class="action-btn new" id="btnNewReg">➕</button>
+            </div>
+            
+            <div class="result-section" id="resultSection">
+                <div class="success-box">
+                    <h2 id="successTitle">✅ VIP Approvato!</h2>
+                    <p id="successSub">Benvenuto, VIP!</p>
+                </div>
+                <div class="qr-container"><div id="qrcode"></div></div>
+                <div class="info-box">
+                    <div class="label" id="lblResName">Nome</div>
+                    <div class="value" id="resName">--</div>
+                </div>
+                <div class="info-box">
+                    <div class="label" id="lblResOrg">Organizzazione</div>
+                    <div class="value" id="resOrg">--</div>
+                </div>
+                <div class="info-box">
+                    <div class="label" id="lblResNum">Numero Personale</div>
+                    <div class="value" id="resNum" style="font-size:2em;">--</div>
+                </div>
+                <button class="action-btn download" id="btnDownload">📥 Download</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var SUPABASE_URL = 'https://mfwgfgjneeymavxgbwde.supabase.co';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1md2dmZ2puZWV5bWF2eGdid2RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTMzNzgsImV4cCI6MjA4Mzk4OTM3OH0.11Ww-TwArHnrM6Lw7q_ZbJu5tFLugsAq9jT6H6p42WE';
+        var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        var lang = 'it', lotteryVerified = false, currentReg = {};
+        
+        var T = {
+            it: {
+                headerTitle: 'Festa delle Lanterne 2026',
+                lblName: 'Nome Completo', phName: 'Inserisci il tuo nome',
+                lblOrg: 'Organizzazione', phOrg: 'Inserisci la tua organizzazione',
+                lblLottery: '🎯 Numero Personale',
+                hintLottery: 'Scegli 4 cifre personalmente oppure seleziona l\'assegnazione casuale',
+                btnSubmit: '👑 REGISTRA VIP',
+                loadingText: 'Elaborazione...',
+                pendingTitle: '⏳ In Attesa di Approvazione',
+                pendingMsg: 'La tua registrazione VIP è stata inviata. Attendi l\'approvazione.',
+                lblNum: 'Numero Personale',
+                successTitle: '✅ VIP Approvato!',
+                successSub: 'Benvenuto, VIP!',
+                lblResName: 'Nome', lblResOrg: 'Organizzazione', lblResNum: 'Numero Personale',
+                lotteryAvailable: '✅ Disponibile!',
+                lotteryTaken: '❌ Già utilizzato',
+                lotteryChecking: '⏳ Verifica...',
+                lotteryInvalid: '❌ Inserisci 4 cifre',
+                alertDuplicate: '⚠️ Già Registrato',
+                alertDuplicateMsg: 'Esiste già una registrazione con questi dati.',
+                alertError: '❌ Errore',
+                alertErrorMsg: 'Si è verificato un errore.',
+                alertName: '❌ Nome richiesto',
+                alertOrg: '❌ Organizzazione richiesta'
+            },
+            zh: {
+                headerTitle: '2026 迎新春 闹元宵',
+                lblName: '姓名', phName: '请输入您的全名',
+                lblOrg: '单位/组织', phOrg: '请输入您的单位或组织',
+                lblLottery: '🎯 个人号码',
+                hintLottery: '自己选四个数字或者选择随机派发',
+                btnSubmit: '👑 VIP注册',
+                loadingText: '处理中...',
+                pendingTitle: '⏳ 等待审核',
+                pendingMsg: '您的VIP注册已提交，请等待审核。',
+                lblNum: '个人号码',
+                successTitle: '✅ VIP已通过！',
+                successSub: '欢迎，VIP贵宾！',
+                lblResName: '姓名', lblResOrg: '单位', lblResNum: '个人号码',
+                lotteryAvailable: '✅ 可用！',
+                lotteryTaken: '❌ 已被使用',
+                lotteryChecking: '⏳ 验证中...',
+                lotteryInvalid: '❌ 请输入4位数字',
+                alertDuplicate: '⚠️ 已注册',
+                alertDuplicateMsg: '已存在相同信息的注册记录。',
+                alertError: '❌ 错误',
+                alertErrorMsg: '发生错误，请重试。',
+                alertName: '❌ 请输入姓名',
+                alertOrg: '❌ 请输入单位'
+            }
+        };
+        
+        var $ = function(id) { return document.getElementById(id); };
+        function showModal(t, m) { $('modalTitle').textContent = t; $('modalMsg').textContent = m; $('modalOverlay').classList.add('show'); }
+        function hideModal() { $('modalOverlay').classList.remove('show'); }
+        
+        function updateUI() {
+            var t = T[lang];
+            $('headerTitle').textContent = t.headerTitle;
+            $('lblName').innerHTML = t.lblName + ' <span class="required">*</span>';
+            $('inputName').placeholder = t.phName;
+            $('lblOrg').innerHTML = t.lblOrg + ' <span class="required">*</span>';
+            $('inputOrg').placeholder = t.phOrg;
+            $('lblLottery').textContent = t.lblLottery;
+            $('hintLottery').textContent = t.hintLottery;
+            $('btnSubmit').textContent = t.btnSubmit;
+            $('loadingText').textContent = t.loadingText;
+            $('pendingTitle').textContent = t.pendingTitle;
+            $('pendingMsg').textContent = t.pendingMsg;
+            $('lblNum').textContent = t.lblNum;
+            $('successTitle').textContent = t.successTitle;
+            $('successSub').textContent = t.successSub;
+            $('lblResName').textContent = t.lblResName;
+            $('lblResOrg').textContent = t.lblResOrg;
+            $('lblResNum').textContent = t.lblResNum;
+            $('switchIt').classList.toggle('active', lang === 'it');
+            $('switchZh').classList.toggle('active', lang === 'zh');
+        }
+        
+        function selectLanguage(l) { lang = l; $('langScreen').classList.add('hidden'); $('mainScreen').classList.remove('hidden'); updateUI(); }
+        function switchLanguage(l) { lang = l; updateUI(); }
+        
+        async function checkLottery() {
+            var num = $('inputLottery').value.replace(/\D/g, '').slice(0, 4); $('inputLottery').value = num;
+            var s = $('lotteryStatus'), t = T[lang];
+            if (num.length !== 4) { s.style.display = 'block'; s.className = 'lottery-status taken'; s.textContent = t.lotteryInvalid; lotteryVerified = false; return; }
+            s.style.display = 'block'; s.className = 'lottery-status checking'; s.textContent = t.lotteryChecking;
+            try { var { data } = await supabase.from('registrations').select('id').eq('lottery_number', num);
+                if (data && data.length > 0) { s.className = 'lottery-status taken'; s.textContent = t.lotteryTaken; lotteryVerified = false; }
+                else { s.className = 'lottery-status available'; s.textContent = t.lotteryAvailable; lotteryVerified = true; }
+            } catch (e) { s.className = 'lottery-status available'; s.textContent = t.lotteryAvailable; lotteryVerified = true; }
+        }
+        
+        async function randomLottery() {
+            var s = $('lotteryStatus'), t = T[lang]; s.style.display = 'block'; s.className = 'lottery-status checking'; s.textContent = t.lotteryChecking;
+            try { var { data } = await supabase.from('registrations').select('lottery_number');
+                var used = (data || []).map(function(r) { return r.lottery_number; }); var num, a = 0;
+                do { num = String(Math.floor(1000 + Math.random() * 9000)); a++; } while (used.indexOf(num) !== -1 && a < 100);
+                $('inputLottery').value = num; s.className = 'lottery-status available'; s.textContent = t.lotteryAvailable; lotteryVerified = true;
+            } catch (e) { $('inputLottery').value = String(Math.floor(1000 + Math.random() * 9000)); s.className = 'lottery-status available'; s.textContent = t.lotteryAvailable; lotteryVerified = true; }
+        }
+        
+        async function submitReg() {
+            var t = T[lang];
+            var name = $('inputName').value.trim();
+            var org = $('inputOrg').value.trim();
+            if (!name) { showModal(t.alertError, t.alertName); return; }
+            if (!org) { showModal(t.alertError, t.alertOrg); return; }
+            
+            var lottery = $('inputLottery').value.replace(/\D/g, '').slice(0, 4);
+            if (lottery.length === 4 && !lotteryVerified) { await checkLottery(); if (!lotteryVerified) return; }
+            
+            $('regForm').style.display = 'none'; $('loading').classList.add('show');
+            
+            try {
+                // Check duplicate
+                var { data: existing } = await supabase.from('registrations').select('id').eq('name', name).eq('email', org);
+                if (existing && existing.length > 0) { $('loading').classList.remove('show'); $('regForm').style.display = 'block'; showModal(t.alertDuplicate, t.alertDuplicateMsg); return; }
+                
+                if (lottery.length !== 4) {
+                    var { data: nums } = await supabase.from('registrations').select('lottery_number');
+                    var used = (nums || []).map(function(r) { return r.lottery_number; });
+                    do { lottery = String(Math.floor(1000 + Math.random() * 9000)); } while (used.indexOf(lottery) !== -1);
+                }
+                
+                var id = 'VIP-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
+                
+                var { error } = await supabase.from('registrations').insert([{
+                    id: id, name: name, role: 'vip', email: org, phone: null,
+                    lottery_number: lottery, entry_time: '14:00', entered: false
+                }]);
+                if (error) throw error;
+                
+                $('loading').classList.remove('show');
+                $('pendingSection').classList.add('show');
+                $('pendingId').textContent = id;
+                $('pendingNum').textContent = lottery;
+                
+                currentReg = { id: id, name: name, org: org, lottery: lottery };
+            } catch (e) { console.error(e); $('loading').classList.remove('show'); $('regForm').style.display = 'block'; showModal(t.alertError, t.alertErrorMsg); }
+        }
+        
+        function showResult() {
+            $('resultSection').classList.add('show');
+            $('resName').textContent = currentReg.name;
+            $('resOrg').textContent = currentReg.org;
+            $('resNum').textContent = currentReg.lottery;
+            var qr = $('qrcode'); qr.innerHTML = '';
+            new QRCode(qr, { text: JSON.stringify(currentReg), width: 200, height: 200, colorDark: '#0d0d0d', colorLight: '#fff', correctLevel: QRCode.CorrectLevel.H });
+        }
+        
+        function newReg() { $('regForm').style.display = 'block'; $('pendingSection').classList.remove('show'); $('resultSection').classList.remove('show'); $('lotteryStatus').style.display = 'none'; $('inputLottery').value = ''; lotteryVerified = false; }
+        
+        function downloadTicket() {
+            var c = document.querySelector('#qrcode canvas'); if (!c) return;
+            var cv = document.createElement('canvas'), x = cv.getContext('2d');
+            cv.width = 400; cv.height = 500;
+            x.fillStyle = '#0d0d0d'; x.fillRect(0, 0, cv.width, cv.height);
+            x.strokeStyle = '#d4af37'; x.lineWidth = 4; x.strokeRect(10, 10, cv.width - 20, cv.height - 20);
+            x.fillStyle = '#d4af37'; x.font = 'bold 24px Arial'; x.textAlign = 'center';
+            x.fillText('👑 VIP', cv.width / 2, 50);
+            x.drawImage(c, (cv.width - 160) / 2, 70, 160, 160);
+            x.fillStyle = '#fff'; x.font = '16px Arial';
+            x.fillText(currentReg.name, cv.width / 2, 260);
+            x.fillText(currentReg.org, cv.width / 2, 290);
+            x.fillStyle = '#d4af37'; x.font = 'bold 48px Arial';
+            x.fillText(currentReg.lottery, cv.width / 2, 370);
+            x.fillStyle = '#87CEEB'; x.font = '12px Arial';
+            x.fillText('01/03/2026 | Piazzale Michelangelo', cv.width / 2, cv.height - 30);
+            var link = document.createElement('a'); link.download = 'VIP_' + currentReg.id + '.png'; link.href = cv.toDataURL('image/png'); link.click();
+        }
+        
+        $('btnLangIt').addEventListener('click', function() { selectLanguage('it'); });
+        $('btnLangZh').addEventListener('click', function() { selectLanguage('zh'); });
+        $('switchIt').addEventListener('click', function() { switchLanguage('it'); });
+        $('switchZh').addEventListener('click', function() { switchLanguage('zh'); });
+        $('btnCheckLottery').addEventListener('click', checkLottery);
+        $('btnRandomLottery').addEventListener('click', randomLottery);
+        $('btnSubmit').addEventListener('click', submitReg);
+        $('btnNewReg').addEventListener('click', newReg);
+        $('btnDownload').addEventListener('click', downloadTicket);
+        $('btnGoCheck').addEventListener('click', function() { showResult(); $('pendingSection').classList.remove('show'); });
+        $('modalBtn').addEventListener('click', hideModal);
+        $('modalOverlay').addEventListener('click', function(e) { if (e.target === $('modalOverlay')) hideModal(); });
+        $('inputLottery').addEventListener('input', function() { this.value = this.value.replace(/\D/g, '').slice(0, 4); lotteryVerified = false; });
+    })();
+    </script>
+</body>
+</html>

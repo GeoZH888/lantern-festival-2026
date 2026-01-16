@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Stats | 现场统计</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            background: linear-gradient(135deg, #0d0d0d 0%, #1a0a0a 50%, #2d1515 100%);
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        .lang-switch { position: fixed; top: 10px; right: 10px; display: flex; gap: 8px; z-index: 100; }
+        .lang-switch button { padding: 8px 15px; border: 2px solid #ffd700; background: rgba(255, 215, 0, 0.2); color: #ffd700; border-radius: 8px; cursor: pointer; font-size: 1em; }
+        .lang-switch button.active { background: #ffd700; color: #0d0d0d; }
+        
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 15px 30px;
+        }
+        
+        .header {
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .lanterns {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .header h1 {
+            font-size: 2.2em;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            margin-bottom: 3px;
+        }
+        .header h2 {
+            font-size: 1.2em;
+            color: #ff6b35;
+        }
+        
+        .middle-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            flex: 1;
+        }
+        
+        .timestamp-display {
+            background: linear-gradient(135deg, rgba(33, 150, 243, 0.2), rgba(13, 71, 161, 0.2));
+            border: 3px solid #2196F3;
+            border-radius: 20px;
+            padding: 20px 40px;
+            text-align: center;
+        }
+        .timestamp-display .label {
+            color: #87CEEB;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+        }
+        .timestamp-display .time {
+            font-size: 3em;
+            font-weight: bold;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 15px rgba(33, 150, 243, 0.5);
+        }
+        .timestamp-display .date {
+            font-size: 1.1em;
+            color: #64B5F6;
+            margin-top: 5px;
+        }
+        
+        .countdown-display {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.2), rgba(183, 28, 28, 0.2));
+            border: 3px solid #f44336;
+            border-radius: 20px;
+            padding: 20px 30px;
+            text-align: center;
+        }
+        .countdown-display .label {
+            color: #ff8a80;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        .countdown-grid {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+        .countdown-item {
+            text-align: center;
+        }
+        .countdown-item .num {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 15px rgba(244, 67, 54, 0.5);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px 15px;
+            border-radius: 10px;
+            min-width: 70px;
+            display: inline-block;
+        }
+        .countdown-item .unit {
+            font-size: 0.9em;
+            color: #ff8a80;
+            margin-top: 5px;
+        }
+        .countdown-display.started {
+            border-color: #4CAF50;
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(46, 125, 50, 0.2));
+        }
+        .countdown-display.started .label {
+            color: #a5d6a7;
+        }
+        .countdown-display.started .num {
+            text-shadow: 0 0 15px rgba(76, 175, 80, 0.5);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            flex-shrink: 0;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid;
+            border-radius: 15px;
+            padding: 20px 15px;
+            text-align: center;
+        }
+        .stat-card .icon {
+            font-size: 2em;
+            margin-bottom: 8px;
+        }
+        .stat-card .number {
+            font-size: 3.5em;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        .stat-card .label {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .stat-card.total { border-color: #ffd700; }
+        .stat-card.total .number { color: #ffd700; }
+        .stat-card.total .label { color: #ffd700; }
+        
+        .stat-card.pending { border-color: #FF9800; }
+        .stat-card.pending .number { color: #FF9800; }
+        .stat-card.pending .label { color: #FF9800; }
+        
+        .stat-card.verified { border-color: #4CAF50; }
+        .stat-card.verified .number { color: #4CAF50; }
+        .stat-card.verified .label { color: #4CAF50; }
+        
+        .stat-card.entered { border-color: #2196F3; }
+        .stat-card.entered .number { color: #2196F3; }
+        .stat-card.entered .label { color: #2196F3; }
+        
+        .progress-section {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            flex-shrink: 0;
+        }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+        .progress-label .left { color: #87CEEB; }
+        .progress-label .right { color: #4CAF50; font-weight: bold; }
+        .progress-bar {
+            height: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            border-radius: 15px;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #fff;
+            font-size: 1em;
+        }
+        
+        .fullscreen-btn {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+            border: none;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .fullscreen-btn:hover { transform: scale(1.05); }
+        
+        @media (max-width: 1200px) {
+            .stats-grid { grid-template-columns: repeat(4, 1fr); gap: 15px; }
+            .stat-card .number { font-size: 2.5em; }
+            .stat-card { padding: 15px 10px; }
+            .middle-section { flex-direction: column; gap: 15px; }
+        }
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .header h1 { font-size: 1.6em; }
+            .countdown-item .num { font-size: 1.8em; padding: 5px 10px; min-width: 50px; }
+            .timestamp-display .time { font-size: 2em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="lang-switch">
+        <button id="switchIt">🇮🇹 IT</button>
+        <button id="switchZh">🇨🇳 中文</button>
+    </div>
+    
+    <button class="fullscreen-btn" id="btnFullscreen">⛶</button>
+    
+    <div class="container">
+        <div class="header">
+            <div class="lanterns">🏮🏮🏮</div>
+            <h1 id="headerTitle">Festa delle Lanterne 2026</h1>
+            <h2>Piazzale Michelangelo, Firenze</h2>
+        </div>
+        
+        <div class="middle-section">
+            <div class="timestamp-display">
+                <div class="label" id="lblTime">Orario Attuale</div>
+                <div class="time" id="currentTime">--:--:--</div>
+                <div class="date" id="currentDate">--/--/----</div>
+            </div>
+            
+            <div class="countdown-display" id="countdownBox">
+                <div class="label" id="lblCountdown">距离活动开始还有</div>
+                <div class="countdown-grid">
+                    <div class="countdown-item">
+                        <div class="num" id="countDays">00</div>
+                        <div class="unit" id="unitDays">天</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="num" id="countHours">00</div>
+                        <div class="unit" id="unitHours">时</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="num" id="countMins">00</div>
+                        <div class="unit" id="unitMins">分</div>
+                    </div>
+                    <div class="countdown-item">
+                        <div class="num" id="countSecs">00</div>
+                        <div class="unit" id="unitSecs">秒</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card total">
+                <div class="icon">📝</div>
+                <div class="number" id="statTotal">0</div>
+                <div class="label" id="lblTotal">Registrati</div>
+            </div>
+            <div class="stat-card pending">
+                <div class="icon">⏳</div>
+                <div class="number" id="statPending">0</div>
+                <div class="label" id="lblPending">In Attesa</div>
+            </div>
+            <div class="stat-card verified">
+                <div class="icon">✅</div>
+                <div class="number" id="statVerified">0</div>
+                <div class="label" id="lblVerified">Verificati</div>
+            </div>
+            <div class="stat-card entered">
+                <div class="icon">🚪</div>
+                <div class="number" id="statEntered">0</div>
+                <div class="label" id="lblEntered">Entrati</div>
+            </div>
+        </div>
+        
+        <div class="progress-section">
+            <div class="progress-label">
+                <span class="left" id="lblProgress">Progresso Ingresso</span>
+                <span class="right" id="progressPercent">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var SUPABASE_URL = 'https://mfwgfgjneeymavxgbwde.supabase.co';
+        var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1md2dmZ2puZWV5bWF2eGdid2RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MTMzNzgsImV4cCI6MjA4Mzk4OTM3OH0.11Ww-TwArHnrM6Lw7q_ZbJu5tFLugsAq9jT6H6p42WE';
+        var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        var lang = 'it';
+        
+        var T = {
+            it: {
+                headerTitle: 'Festa delle Lanterne 2026',
+                lblTime: 'Orario Attuale',
+                lblCountdown: 'Tempo all\'inizio dell\'evento',
+                lblStarted: '🎉 Evento in corso!',
+                unitDays: 'Giorni',
+                unitHours: 'Ore',
+                unitMins: 'Min',
+                unitSecs: 'Sec',
+                lblTotal: 'Registrati',
+                lblPending: 'In Attesa',
+                lblVerified: 'Verificati',
+                lblEntered: 'Entrati',
+                lblProgress: 'Progresso Ingresso',
+                lblUpdate: 'Aggiornamento automatico'
+            },
+            zh: {
+                headerTitle: '2026 迎新春 闹元宵',
+                lblTime: '当前时间',
+                lblCountdown: '距离活动开始还有',
+                lblStarted: '🎉 活动进行中！',
+                unitDays: '天',
+                unitHours: '时',
+                unitMins: '分',
+                unitSecs: '秒',
+                lblTotal: '已注册',
+                lblPending: '待审核',
+                lblVerified: '已审核',
+                lblEntered: '已入场',
+                lblProgress: '入场进度',
+                lblUpdate: '自动更新'
+            }
+        };
+        
+        var $ = function(id) { return document.getElementById(id); };
+        
+        function updateUI() {
+            var t = T[lang];
+            $('headerTitle').textContent = t.headerTitle;
+            $('lblTime').textContent = t.lblTime;
+            $('unitDays').textContent = t.unitDays;
+            $('unitHours').textContent = t.unitHours;
+            $('unitMins').textContent = t.unitMins;
+            $('unitSecs').textContent = t.unitSecs;
+            $('lblTotal').textContent = t.lblTotal;
+            $('lblPending').textContent = t.lblPending;
+            $('lblVerified').textContent = t.lblVerified;
+            $('lblEntered').textContent = t.lblEntered;
+            $('lblProgress').textContent = t.lblProgress;
+            $('switchIt').classList.toggle('active', lang === 'it');
+            $('switchZh').classList.toggle('active', lang === 'zh');
+            updateCountdown();
+        }
+        
+        function updateClock() {
+            var now = new Date();
+            var time = now.toLocaleTimeString(lang === 'it' ? 'it-IT' : 'zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            var date = now.toLocaleDateString(lang === 'it' ? 'it-IT' : 'zh-CN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            $('currentTime').textContent = time;
+            $('currentDate').textContent = date;
+            updateCountdown();
+        }
+        
+        function updateCountdown() {
+            var t = T[lang];
+            // Event date: March 1, 2026 at 15:00 (visitor start time)
+            var eventDate = new Date('2026-03-01T15:00:00');
+            var now = new Date();
+            var diff = eventDate - now;
+            
+            if (diff <= 0) {
+                // Event has started
+                $('lblCountdown').textContent = t.lblStarted;
+                $('countDays').textContent = '🎉';
+                $('countHours').textContent = '🎊';
+                $('countMins').textContent = '🏮';
+                $('countSecs').textContent = '🎇';
+                $('countdownBox').classList.add('started');
+            } else {
+                $('lblCountdown').textContent = t.lblCountdown;
+                $('countdownBox').classList.remove('started');
+                
+                var days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                var hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                var mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                var secs = Math.floor((diff % (1000 * 60)) / 1000);
+                
+                $('countDays').textContent = String(days).padStart(2, '0');
+                $('countHours').textContent = String(hours).padStart(2, '0');
+                $('countMins').textContent = String(mins).padStart(2, '0');
+                $('countSecs').textContent = String(secs).padStart(2, '0');
+            }
+        }
+        
+        async function loadStats() {
+            try {
+                var { data, error } = await supabase.from('registrations').select('*');
+                if (error) throw error;
+                
+                var total = data ? data.length : 0;
+                var pending = data ? data.filter(function(r) { return r.verified !== true; }).length : 0;
+                var verified = data ? data.filter(function(r) { return r.verified === true && !r.entered; }).length : 0;
+                var entered = data ? data.filter(function(r) { return r.entered === true; }).length : 0;
+                
+                // Animate numbers
+                animateNumber('statTotal', total);
+                animateNumber('statPending', pending);
+                animateNumber('statVerified', verified);
+                animateNumber('statEntered', entered);
+                
+                // Progress bar
+                var progress = total > 0 ? Math.round((entered / total) * 100) : 0;
+                $('progressFill').style.width = progress + '%';
+                $('progressFill').textContent = entered + ' / ' + total;
+                $('progressPercent').textContent = progress + '%';
+                
+            } catch (e) {
+                console.error('Load error:', e);
+            }
+        }
+        
+        function animateNumber(id, target) {
+            var el = $(id);
+            var current = parseInt(el.textContent) || 0;
+            if (current === target) return;
+            
+            var step = target > current ? 1 : -1;
+            var interval = setInterval(function() {
+                current += step;
+                el.textContent = current;
+                if (current === target) clearInterval(interval);
+            }, 50);
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        // Events
+        $('switchIt').addEventListener('click', function() { lang = 'it'; updateUI(); });
+        $('switchZh').addEventListener('click', function() { lang = 'zh'; updateUI(); });
+        $('btnFullscreen').addEventListener('click', toggleFullscreen);
+        
+        // Initialize
+        updateUI();
+        updateClock();
+        loadStats();
+        
+        // Update clock every second
+        setInterval(updateClock, 1000);
+        
+        // Update stats every 5 seconds
+        setInterval(loadStats, 5000);
+        
+        // Real-time updates
+        supabase.channel('live').on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, function() { loadStats(); }).subscribe();
+    })();
+    </script>
+</body>
+</html>
