@@ -245,7 +245,7 @@
                         <div class="label" id="lblLotteryNum">Numero Lotteria</div>
                         <div class="value" id="pendingLottery" style="color:#ffd700;font-size:1.5em;">--</div>
                     </div>
-                    <p style="color:#87CEEB;margin:20px 0;" id="pendingHint">Usa "🔍 Verifica" per controllare lo stato</p>
+                    <p style="color:#4CAF50;margin:20px 0;font-size:1.1em;font-weight:bold;background:rgba(76,175,80,0.1);padding:15px;border-radius:10px;border:2px solid #4CAF50;" id="pendingHint">Usa "🔍 Verifica" per controllare lo stato</p>
                     <button class="action-btn back-btn" id="btnGoCheck">🔍</button>
                     <button class="action-btn" style="background:#666;color:#fff;margin-left:10px;" id="btnNewReg">➕</button>
                 </div>
@@ -315,10 +315,10 @@
                 lblEmail: 'Email', lblPhone: 'Telefono', hintContact: '* Almeno email o telefono', errContact: 'Inserisci email o telefono',
                 lblRemember: 'Ricorda i miei dati', lblLottery: '🎯 Numero Lotteria', hintLottery: 'Inserisci i tuoi 4 numeri preferiti o assegna casualmente',
                 btnSubmit: '📝 INVIA', loadingText: 'Invio...',
-                pendingTitle: '⏳ In Attesa di Approvazione', pendingMsg: 'La tua registrazione è stata inviata. Attendi l\'approvazione.',
-                lblRegId: 'ID Registrazione', lblLotteryNum: 'Numero Lotteria', pendingHint: 'Usa "🔍 Verifica" per controllare',
+                pendingTitle: '⏳ In Attesa di Approvazione', pendingMsg: 'La tua registrazione è stata inviata. Attendi l\'approvazione. Puoi verificare lo stato in qualsiasi momento!',
+                lblRegId: 'ID Registrazione', lblLotteryNum: 'Numero Lotteria', pendingHint: '👆 Clicca "🔍 Verifica" per controllare lo stato in qualsiasi momento',
                 checkTitle: 'Verifica Stato', lblCheckName: 'Nome', lblCheckContact: 'Email o Telefono', btnCheckStatus: '🔍 VERIFICA',
-                statusPending: '⏳ In Attesa', statusPendingMsg: 'La tua registrazione è in attesa di approvazione.',
+                statusPending: '⏳ In Attesa', statusPendingMsg: 'La tua registrazione è in attesa di approvazione. Ricontrolla più tardi!',
                 statusNotFound: '❌ Non Trovato', statusNotFoundMsg: 'Nessuna registrazione trovata.',
                 successTitle: '✅ Approvato!', successSubtitle: 'Ecco il tuo biglietto',
                 lblTimestamp: 'Registrato il', lotteryAvailable: '✅ Disponibile', lotteryTaken: '❌ Già usato', lotteryChecking: '⏳...', lotteryInvalid: '❌ 4 cifre',
@@ -336,10 +336,10 @@
                 lblEmail: '邮箱', lblPhone: '电话', hintContact: '* 至少填一项', errContact: '请填写邮箱或电话',
                 lblRemember: '记住信息', lblLottery: '🎯 抽奖号码', hintLottery: '输入自己心爱的四位数字或者随机分配',
                 btnSubmit: '📝 提交', loadingText: '提交中...',
-                pendingTitle: '⏳ 等待审核', pendingMsg: '您的注册已提交，请等待审核。',
-                lblRegId: '注册ID', lblLotteryNum: '抽奖号码', pendingHint: '用"🔍 查询"查看状态',
+                pendingTitle: '⏳ 等待审核', pendingMsg: '您的注册已提交，请等待审核。请随时查询注册状态！',
+                lblRegId: '注册ID', lblLotteryNum: '抽奖号码', pendingHint: '👆 点击 "🔍 查询" 随时查看注册状态',
                 checkTitle: '查询状态', lblCheckName: '姓名', lblCheckContact: '邮箱或电话', btnCheckStatus: '🔍 查询',
-                statusPending: '⏳ 等待审核', statusPendingMsg: '您的注册正在等待审核。',
+                statusPending: '⏳ 等待审核', statusPendingMsg: '您的注册正在等待审核，请稍后再来查询！',
                 statusNotFound: '❌ 未找到', statusNotFoundMsg: '未找到注册记录。',
                 successTitle: '✅ 已通过！', successSubtitle: '这是您的门票',
                 lblTimestamp: '注册时间', lotteryAvailable: '✅ 可用', lotteryTaken: '❌ 已用', lotteryChecking: '⏳...', lotteryInvalid: '❌ 4位数',
@@ -421,10 +421,25 @@
         async function submitRegistration() {
             var t = T[lang];
             $('errRole').classList.remove('show'); $('errName').classList.remove('show'); $('errContact').classList.remove('show'); $('inputName').classList.remove('error');
-            if (!selectedRole) { $('errRole').classList.add('show'); return; }
-            var name = $('inputName').value.trim(); if (!name) { $('errName').classList.add('show'); $('inputName').classList.add('error'); return; }
+            
+            if (!selectedRole) { 
+                $('errRole').classList.add('show'); 
+                alert(lang === 'it' ? 'Seleziona un ruolo (Visitatore o Staff)' : '请选择角色（访客或工作人员）');
+                return; 
+            }
+            var name = $('inputName').value.trim(); 
+            if (!name) { 
+                $('errName').classList.add('show'); 
+                $('inputName').classList.add('error'); 
+                alert(lang === 'it' ? 'Inserisci il tuo nome' : '请输入姓名');
+                return; 
+            }
             var email = $('inputEmail').value.trim().toLowerCase(), phone = $('inputPhone').value.trim();
-            if (!email && !phone) { $('errContact').classList.add('show'); return; }
+            if (!email && !phone) { 
+                $('errContact').classList.add('show'); 
+                alert(lang === 'it' ? 'Inserisci email o telefono' : '请输入邮箱或电话');
+                return; 
+            }
             var lottery = $('inputLottery').value.replace(/\D/g, '').slice(0, 4);
             if (lottery.length === 4 && !lotteryVerified) { await checkLottery(); if (!lotteryVerified) return; }
             
@@ -437,11 +452,17 @@
                 var id = 'FDL2026-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substr(2, 4).toUpperCase();
                 var entryTime = selectedRole === 'staff' ? STAFF_TIME : VISITOR_TIME;
                 
+                console.log('Submitting registration:', { id, name, role: selectedRole, email, phone, lottery, entryTime });
+                
                 var { error } = await supabase.from('registrations').insert([{
                     id: id, name: name, role: selectedRole, email: email || null, phone: phone || null,
                     lottery_number: lottery, entry_time: entryTime, entered: false
                 }]);
-                if (error) throw error;
+                
+                if (error) {
+                    console.error('Supabase error:', error);
+                    throw error;
+                }
                 
                 saveUserInfo();
                 $('loadingReg').classList.remove('show');
@@ -449,7 +470,14 @@
                 $('pendingRegId').textContent = id;
                 $('pendingLottery').textContent = lottery;
                 $('checkName').value = name; $('checkContact').value = email || phone;
-            } catch (e) { console.error(e); $('loadingReg').classList.remove('show'); $('regForm').style.display = 'block'; showModal(t.alertError, t.alertErrorMsg); }
+            } catch (e) { 
+                console.error('Registration error:', e); 
+                $('loadingReg').classList.remove('show'); 
+                $('regForm').style.display = 'block'; 
+                alert((lang === 'it' ? 'Errore: ' : '错误：') + (e.message || e.toString()));
+                showModal(t.alertError, t.alertErrorMsg); 
+            }
+        }
         }
         
         async function checkStatus() {
